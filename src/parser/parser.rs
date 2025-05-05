@@ -1,4 +1,4 @@
-use crate::ast::expressions::{IdentifierExpression, IntegerExpression};
+use crate::ast::expressions::{IdentifierExpression, IntegerExpression, PrefixExpression};
 use crate::ast::statements::{ExpressionStatement, LetStatement, ReturnStatement};
 use crate::ast::traits::{Expression, Statement};
 use crate::lexer::lexer::Lexer;
@@ -145,6 +145,16 @@ impl<'a> Parser<'a> {
         Ok(return_statement)
     }
 
+    fn parse_prefix_expression(&mut self) -> PrefixExpression {
+        let mut expression = PrefixExpression::new(self.cur_token.clone());
+
+        self.next_token();
+
+        expression.right = self.parse_expression(PRECEDENCE::PREFIX);
+
+        expression
+    }
+
     fn parse_expression(&mut self, precedece: PRECEDENCE) -> Option<Box<dyn Expression>> {
         match self.cur_token.clone() {
             TokenType::IDENT(_) => {
@@ -155,6 +165,11 @@ impl<'a> Parser<'a> {
             TokenType::INT(_) => {
                 let interget_expression = IntegerExpression::new(self.cur_token.clone());
                 return Some(Box::new(interget_expression));
+            }
+
+            TokenType::BANG | TokenType::MINUS => {
+                let prefix_expression = self.parse_prefix_expression();
+                return Some(Box::new(prefix_expression));
             }
             _ => None,
         }
@@ -201,6 +216,7 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod test {
+
     use crate::ast::ast::Program;
 
     use super::*;
@@ -213,26 +229,23 @@ mod test {
         let mut p = Program::new(parser);
         p.parse_program();
         assert_eq!(p.statements.len(), 1);
-        let statement = p.statements.get(0).unwrap();
-        assert!(
-            statement
-                .as_any()
-                .downcast_ref::<ExpressionStatement>()
-                .is_some()
-        );
+        let statement = &p.statements[0];
+        let expr_statment = statement
+            .as_any()
+            .downcast_ref::<ExpressionStatement>()
+            .expect("Expected an expression statemnt");
 
-        if let Some(expr_statement) = statement.as_any().downcast_ref::<ExpressionStatement>() {
-            if let Some(inner_expression) = &expr_statement.expression {
-                if let Some(inner_expr) = inner_expression
-                    .as_any()
-                    .downcast_ref::<IdentifierExpression>()
-                {
-                    assert_eq!(inner_expr.string_representation(), "foobar".to_string());
-                }
-            }
-        } else {
-            panic!("Omg");
-        }
+        let expression = expr_statment
+            .expression
+            .as_ref()
+            .expect("Expression needs to exists in an expression statement");
+
+        let identifier_expression = expression
+            .as_any()
+            .downcast_ref::<IdentifierExpression>()
+            .expect("This needs to be an identifier expression");
+
+        assert_eq!(identifier_expression.string_representation(), "foobar");
     }
 
     #[test]
@@ -243,36 +256,66 @@ mod test {
         let mut p = Program::new(parser);
         p.parse_program();
         assert_eq!(p.statements.len(), 1);
-        let statement = p.statements.get(0).unwrap();
-        assert!(
-            statement
-                .as_any()
-                .downcast_ref::<ExpressionStatement>()
-                .is_some()
-        );
+        let statement = &p.statements[0];
+        let expr_statmet = statement
+            .as_any()
+            .downcast_ref::<ExpressionStatement>()
+            .expect("Expected ExpressionStatement");
 
-        if let Some(expr_statement) = statement.as_any().downcast_ref::<ExpressionStatement>() {
-            if let Some(inner_expression) = &expr_statement.expression {
-                if let Some(inner_expr) = inner_expression
-                    .as_any()
-                    .downcast_ref::<IntegerExpression>()
-                {
-                    assert_eq!(inner_expr.value, 5);
-                    assert_eq!(inner_expr.string_representation(), "5".to_string());
-                }
-            } else {
-                panic!("noooo");
-            }
-        }
+        let expression = expr_statmet
+            .expression
+            .as_ref()
+            .expect("Expression should exists");
+
+        let integer_expression = expression
+            .as_any()
+            .downcast_ref::<IntegerExpression>()
+            .expect("Expected Prefix Expression");
+
+        assert_eq!(integer_expression.value, 5);
+        assert_eq!(integer_expression.string_representation(), "5");
+    }
+
+    fn test_interget_literal(expr: &dyn Expression, value: usize) -> bool {
+        expr.as_any()
+            .downcast_ref::<IntegerExpression>()
+            .map_or(false, |int_expr| int_expr.value == value)
     }
 
     #[test]
     fn test_prefix_bang_operand() {
-        let input = "!5;";
-        let mut lexer = Lexer::new(input);
-        let parser = Parser::new(&mut lexer);
-        let mut p = Program::new(parser);
-        p.parse_program();
-        assert_eq!(p.statements.len(), 1);
+        let input: Vec<String> = vec!["!5;".to_string(), "-15;".to_string()];
+        let outputs: Vec<(&str, usize)> = vec![("!", 5), ("-", 15)];
+
+        for (index, inpu) in input.iter().enumerate() {
+            let mut lexer = Lexer::new(inpu);
+            let parser = Parser::new(&mut lexer);
+            let mut p = Program::new(parser);
+            p.parse_program();
+            assert_eq!(p.statements.len(), 1);
+            let statement = &p.statements[0];
+            let expr_statmet = statement
+                .as_any()
+                .downcast_ref::<ExpressionStatement>()
+                .expect("Expected ExpressionStatement");
+
+            let expression = expr_statmet
+                .expression
+                .as_ref()
+                .expect("Expression should exists");
+
+            let prefix_expression = expression
+                .as_any()
+                .downcast_ref::<PrefixExpression>()
+                .expect("Expected Prefix Expression");
+
+            let right_expr = prefix_expression
+                .right
+                .as_ref()
+                .expect("Right operand should exists");
+            let (output_operator, output_value) = outputs[index];
+            assert_eq!(prefix_expression.operator, output_operator);
+            assert!(test_interget_literal(right_expr.as_ref(), output_value));
+        }
     }
 }

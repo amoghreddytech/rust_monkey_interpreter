@@ -4,4 +4,4 @@ pub mod prefix;
 
 pub use identifier::IdentifierExpression;
 pub use integer::IntegerExpression;
-pub use prefex::PrefixExpression;
+pub use prefix::PrefixExpression;
