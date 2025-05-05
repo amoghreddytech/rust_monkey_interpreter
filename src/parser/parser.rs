@@ -8,6 +8,7 @@ use crate::token::token::{PRECEDENCE, TokenType};
 use anyhow::{Result, anyhow};
 use std::mem;
 
+#[allow(dead_code)]
 pub struct Parser<'a> {
     pub lexer: &'a mut Lexer<'a>,
     pub cur_token: TokenType,
@@ -26,6 +27,7 @@ impl std::fmt::Debug for Parser<'_> {
     }
 }
 
+#[allow(dead_code)]
 impl<'a> Parser<'a> {
     pub fn new(lexer: &'a mut Lexer<'a>) -> Self {
         let cur_token: TokenType = lexer.next_token();
@@ -67,6 +69,14 @@ impl<'a> Parser<'a> {
         } else {
             return false;
         }
+    }
+
+    fn get_cur_precedence(&self) -> PRECEDENCE {
+        self.cur_token.get_precedence()
+    }
+
+    fn get_peek_precedence(&self) -> PRECEDENCE {
+        self.next_token.get_precedence()
     }
 
     fn parse_let_statement(&mut self) -> Result<LetStatement> {
@@ -144,10 +154,6 @@ impl<'a> Parser<'a> {
         expression.right = self.parse_expression(PRECEDENCE::PREFIX);
 
         expression
-    }
-
-    fn cur_precedence(&self) -> PRECEDENCE {
-        todo!()
     }
 
     fn parse_infix_expression(&mut self, left: Box<dyn Expression>) -> InfixExpression {
