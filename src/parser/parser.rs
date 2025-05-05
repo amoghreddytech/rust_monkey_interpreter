@@ -146,7 +146,10 @@ impl<'a> Parser<'a> {
         Ok(return_statement)
     }
 
-    fn parse_prefix_expression(&mut self) -> PrefixExpression {
+    // this function is used for bang "!" and "-"
+    // the naming is pretty weird here.
+    // this is actual technical debt lol
+    fn parse_prefix_expression_bang_and_minus(&mut self) -> PrefixExpression {
         let mut expression = PrefixExpression::new(self.cur_token.clone());
 
         self.next_token();
@@ -156,36 +159,63 @@ impl<'a> Parser<'a> {
         expression
     }
 
-    fn parse_infix_expression(&mut self, left: Box<dyn Expression>) -> InfixExpression {
+    fn parse_infix_expression(&mut self, left: Box<dyn Expression>) -> Option<Box<dyn Expression>> {
         let mut expression = InfixExpression::new(self.cur_token.clone(), left);
 
-        let cur_precedence: PRECEDENCE = self.cur_precedence();
+        let cur_precedence: PRECEDENCE = self.get_cur_precedence();
 
         self.next_token();
 
         expression.right = self.parse_expression(cur_precedence);
 
-        expression
+        Some(Box::new(expression))
     }
 
-    fn parse_expression(&mut self, precedece: PRECEDENCE) -> Option<Box<dyn Expression>> {
+    fn parse_prefix(&mut self) -> Option<Box<dyn Expression>> {
         match self.cur_token.clone() {
             TokenType::IDENT(_) => {
                 let ident_expression = IdentifierExpression::new(self.cur_token.clone());
-                return Some(Box::new(ident_expression));
+                Some(Box::new(ident_expression))
             }
 
             TokenType::INT(_) => {
                 let interget_expression = IntegerExpression::new(self.cur_token.clone());
-                return Some(Box::new(interget_expression));
+                Some(Box::new(interget_expression))
             }
 
             TokenType::BANG | TokenType::MINUS => {
-                let prefix_expression = self.parse_prefix_expression();
-                return Some(Box::new(prefix_expression));
+                let prefix_expression = self.parse_prefix_expression_bang_and_minus();
+                Some(Box::new(prefix_expression))
             }
             _ => None,
         }
+    }
+
+    fn parse_expression(&mut self, precedence: PRECEDENCE) -> Option<Box<dyn Expression>> {
+        let mut left = self.parse_prefix()?;
+
+        let precedence_as_usize = precedence as usize;
+
+        while !self.compare_next_token(&TokenType::SEMICOLON)
+            && precedence_as_usize < self.get_peek_precedence() as usize
+        {
+            left = match self.next_token {
+                TokenType::PLUS
+                | TokenType::MINUS
+                | TokenType::SLASH
+                | TokenType::ASTERISK
+                | TokenType::EQ
+                | TokenType::NOTEQ
+                | TokenType::LT
+                | TokenType::GT => {
+                    self.next_token();
+                    self.parse_infix_expression(left)?
+                }
+                _ => break,
+            };
+        }
+
+        Some(left)
     }
 
     fn parse_expression_statement(&mut self) -> Result<ExpressionStatement> {
@@ -329,6 +359,62 @@ mod test {
             let (output_operator, output_value) = outputs[index];
             assert_eq!(prefix_expression.operator, output_operator);
             assert!(test_interget_literal(right_expr.as_ref(), output_value));
+        }
+    }
+
+    #[test]
+    fn test_infix_expressions() {
+        let input: Vec<(String, usize, String, usize)> = vec![
+            ("5 + 5".to_string(), 5, "+".to_string(), 5),
+            ("5 - 5".to_string(), 5, "-".to_string(), 5),
+            ("5 * 5".to_string(), 5, "*".to_string(), 5),
+            ("5 / 5".to_string(), 5, "/".to_string(), 5),
+            ("5 > 5".to_string(), 5, ">".to_string(), 5),
+            ("5 < 5".to_string(), 5, "<".to_string(), 5),
+            ("5 == 5".to_string(), 5, "==".to_string(), 5),
+            ("5 != 6".to_string(), 5, "!=".to_string(), 6),
+        ];
+
+        for (index, values) in input.iter().enumerate() {
+            let (inpu, left_value, operator, right_value) = values;
+            let mut lexer = Lexer::new(inpu);
+            let parser = Parser::new(&mut lexer);
+            let mut p = Program::new(parser);
+            p.parse_program();
+            assert_eq!(p.statements.len(), 1);
+
+            let statement = &p.statements[0];
+
+            let expr_statement = statement
+                .as_any()
+                .downcast_ref::<ExpressionStatement>()
+                .expect("Expected an expression statemnt");
+
+            let expression = expr_statement
+                .expression
+                .as_ref()
+                .expect("Expression should exists");
+
+            let infix_expression = expression
+                .as_any()
+                .downcast_ref::<InfixExpression>()
+                .expect("Expected Infix Expression");
+
+            let left_expression = infix_expression
+                .left
+                .as_ref()
+                .expect("left expression should exists");
+
+            let right_expression = infix_expression
+                .right
+                .as_ref()
+                .expect("right expression should exist");
+
+            assert!(test_interget_literal(left_expression.as_ref(), *left_value));
+            assert!(test_interget_literal(
+                right_expression.as_ref(),
+                *right_value
+            ));
         }
     }
 }
