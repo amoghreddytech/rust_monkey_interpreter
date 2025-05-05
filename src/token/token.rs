@@ -2,6 +2,18 @@ use lazy_static::lazy_static;
 use std::collections::HashMap;
 
 #[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum PRECEDENCE {
+    LOWEST = 1,
+    EQUALS = 2,
+    LESSGREATER = 3,
+    SUM = 4,
+    PRODUCT = 5,
+    PREFIX = 6,
+    CALL = 7,
+}
+
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TokenType {
     ILLEGAL,
@@ -93,6 +105,16 @@ impl TokenType {
             TokenType::IF => "if".to_string(),
             TokenType::ELSE => "else".to_string(),
             TokenType::RETURN => "return".to_string(),
+        }
+    }
+
+    pub fn get_precedence(&self) -> PRECEDENCE {
+        match &self {
+            TokenType::EQ | TokenType::NOTEQ => PRECEDENCE::EQUALS,
+            TokenType::LT | TokenType::GT => PRECEDENCE::LESSGREATER,
+            TokenType::PLUS | TokenType::MINUS => PRECEDENCE::SUM,
+            TokenType::SLASH | TokenType::ASTERISK => PRECEDENCE::PRODUCT,
+            _ => PRECEDENCE::LOWEST,
         }
     }
 }
