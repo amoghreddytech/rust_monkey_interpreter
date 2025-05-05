@@ -1,21 +1,12 @@
-use crate::ast::expressions::{IdentifierExpression, IntegerExpression, PrefixExpression};
+use crate::ast::expressions::{
+    IdentifierExpression, InfixExpression, IntegerExpression, PrefixExpression,
+};
 use crate::ast::statements::{ExpressionStatement, LetStatement, ReturnStatement};
 use crate::ast::traits::{Expression, Statement};
 use crate::lexer::lexer::Lexer;
-use crate::token::token::TokenType;
+use crate::token::token::{PRECEDENCE, TokenType};
 use anyhow::{Result, anyhow};
 use std::mem;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum PRECEDENCE {
-    LOWEST = 1,
-    EQUALS = 2,
-    LESSGREATER = 3,
-    SUM = 4,
-    PRODUCT = 5,
-    PREFIX = 6,
-    CALL = 7,
-}
 
 pub struct Parser<'a> {
     pub lexer: &'a mut Lexer<'a>,
@@ -151,6 +142,22 @@ impl<'a> Parser<'a> {
         self.next_token();
 
         expression.right = self.parse_expression(PRECEDENCE::PREFIX);
+
+        expression
+    }
+
+    fn cur_precedence(&self) -> PRECEDENCE {
+        todo!()
+    }
+
+    fn parse_infix_expression(&mut self, left: Box<dyn Expression>) -> InfixExpression {
+        let mut expression = InfixExpression::new(self.cur_token.clone(), left);
+
+        let cur_precedence: PRECEDENCE = self.cur_precedence();
+
+        self.next_token();
+
+        expression.right = self.parse_expression(cur_precedence);
 
         expression
     }
