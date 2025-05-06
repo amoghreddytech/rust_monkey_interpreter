@@ -37,7 +37,7 @@ impl PrefixExpression {
 impl Expression for PrefixExpression {
     fn string_representation(&self) -> String {
         if let Some(expr) = &self.right {
-            "(".to_string() + &expr.string_representation() + &self.operator.clone() + ")"
+            "(".to_string() + &self.operator.clone() + &expr.string_representation() + ")"
         } else {
             "(".to_string() + "None" + &self.operator.clone() + ")"
         }
