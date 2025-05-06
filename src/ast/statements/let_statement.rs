@@ -6,23 +6,32 @@ pub struct LetStatement {
     value: Option<Box<dyn Expression>>, // This could also be Vec<T> later let's see
 }
 
+impl LetStatement {
+    fn token_literal(&self) -> String {
+        self.name.clone()
+    }
+}
+
 impl Statement for LetStatement {
     fn string_representation(&self) -> String {
-        // let token = TokenType::LET;
-        // let mut buffer = String::new();
-        // buffer.push_str(&token.string_representation());
-        // buffer.push_str(" ");
-        // buffer.push_str(" = ");
+        let mut buffer = String::new();
 
-        // if let Some(value) = &self.value {
-        // buffer.push_str(&value.string_representation());
-        // }
-        // buffer
-        self.name.clone()
+        buffer.push_str(&self.token_literal());
+        buffer.push_str(" ");
+        buffer.push_str(" = ");
+
+        if let Some(value) = &self.value {
+            buffer.push_str(&value.string_representation());
+        }
+        buffer
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
         self
+    }
+
+    fn token_literal(&self) -> String {
+        self.name.clone()
     }
 }
 
