@@ -417,4 +417,49 @@ mod test {
             ));
         }
     }
+
+    #[test]
+    fn test_operator_precedence_parsing() {
+        let inputs: Vec<String> = vec![
+            "-a * b".to_string(),
+            "a + b + c".to_string(),
+            "a + b - c".to_string(),
+            "a * b * c".to_string(),
+            "a * b / c".to_string(),
+            "a + b / c".to_string(),
+            "a + b * c + d / e - f".to_string(),
+            "3 + 4; -5 * 5".to_string(),
+            "5 > 4 == 3 < 4".to_string(),
+            "5 < 4 != 3 > 4".to_string(),
+            "3 + 4 * 5 == 3 * 1 + 4 * 5".to_string(),
+            "3 + 4 * 5 == 3 * 1 + 4 * 5".to_string(),
+        ];
+        let outputs: Vec<String> = vec![
+            "((-a) * b)".to_string(),
+            "((a + b) + c)".to_string(),
+            "((a + b) - c)".to_string(),
+            "((a * b) * c)".to_string(),
+            "((a * b) / c)".to_string(),
+            "(a + (b / c))".to_string(),
+            "(((a + (b * c)) + (d / e)) - f)".to_string(),
+            "(3 + 4)((-5) * 5)".to_string(),
+            "((5 > 4) == (3 < 4))".to_string(),
+            "((5 < 4) != (3 > 4))".to_string(),
+            "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))".to_string(),
+            "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))".to_string(),
+        ];
+
+        for (input, output) in inputs.iter().zip(outputs.iter()) {
+            let mut lexer = Lexer::new(input);
+            let parser = Parser::new(&mut lexer);
+            let mut p = Program::new(parser);
+            p.parse_program();
+
+            let actual = p.string();
+
+            // println!("{:#?}", p.statements);
+
+            assert_eq!(actual, output.clone());
+        }
+    }
 }
