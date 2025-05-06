@@ -21,34 +21,17 @@ impl InfixExpression {
 
 impl Expression for InfixExpression {
     fn string_representation(&self) -> String {
-        if let (Some(l), Some(r)) = (&self.left, &self.right) {
-            return "(".to_string()
-                + &l.string_representation()
-                + " "
-                + &self.operator
-                + " "
-                + &r.string_representation();
+        let left_str = match &self.left {
+            Some(l) => l.string_representation(),
+            None => "left is none".to_string(),
         };
 
-        if let Some(l) = &self.left {
-            return "(".to_string()
-                + &l.string_representation()
-                + " "
-                + &self.operator
-                + " "
-                + "right is none";
+        let right_str = match &self.right {
+            Some(r) => r.string_representation(),
+            None => "right is none".to_string(),
         };
 
-        if let Some(r) = &self.right {
-            return "(".to_string()
-                + "left is none"
-                + " "
-                + &self.operator
-                + " "
-                + &r.string_representation();
-        };
-
-        "(".to_string() + "left is none" + " " + &self.operator + " " + "right is None"
+        format!("({} {} {})", left_str, self.operator, right_str)
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
