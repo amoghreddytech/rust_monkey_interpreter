@@ -21,6 +21,10 @@ impl Statement for ExpressionStatement {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
+
+    fn token_literal(&self) -> String {
+        self.token.string_representation()
+    }
 }
 
 impl ExpressionStatement {

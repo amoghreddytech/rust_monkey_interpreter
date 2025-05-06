@@ -8,17 +8,20 @@ pub struct ReturnStatement {
 
 impl Statement for ReturnStatement {
     fn string_representation(&self) -> String {
-        // let mut buffer = String::new();
-        // buffer.push_str("return ");
-        // if let Some(value) = &self.return_value {
-        // buffer.push_str(&value.string_representation());
-        // }
-        // buffer
-        "return".to_string()
+        let mut buffer = String::new();
+        buffer.push_str(&self.token_literal());
+        if let Some(value) = &self.return_value {
+            buffer.push_str(&value.string_representation());
+        }
+        buffer
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
         self
+    }
+
+    fn token_literal(&self) -> String {
+        "return".to_string()
     }
 }
 
