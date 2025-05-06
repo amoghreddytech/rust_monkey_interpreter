@@ -39,6 +39,16 @@ impl<'a> Program<'a> {
             self.parser.next_token()
         }
     }
+
+    pub fn string(&self) -> String {
+        let mut buffer = String::new();
+
+        for stmt in &self.statements {
+            buffer.push_str(&stmt.string_representation());
+        }
+
+        return buffer;
+    }
 }
 
 #[cfg(test)]
@@ -66,7 +76,7 @@ let foobar = 838383;";
         assert_eq!(program.statements.len(), 3);
         let mut output_vec = vec![];
         for stmt in program.statements {
-            output_vec.push(stmt.string_representation());
+            output_vec.push(stmt.token_literal());
         }
 
         let test_outputs_left_side = vec!["x".to_string(), "y".to_string(), "foobar".to_string()];
