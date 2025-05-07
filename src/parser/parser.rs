@@ -1,5 +1,5 @@
 use crate::ast::expressions::{
-    IdentifierExpression, InfixExpression, IntegerExpression, PrefixExpression,
+    BooleanExpression, IdentifierExpression, InfixExpression, IntegerExpression, PrefixExpression,
 };
 use crate::ast::statements::{ExpressionStatement, LetStatement, ReturnStatement};
 use crate::ast::traits::{Expression, Statement};
@@ -187,6 +187,11 @@ impl<'a> Parser<'a> {
                 let prefix_expression = self.parse_prefix_expression_bang_and_minus();
                 Some(Box::new(prefix_expression))
             }
+
+            TokenType::TRUE | TokenType::FALSE => {
+                let boolean_expression = BooleanExpression::new(self.cur_token.clone());
+                Some(Box::new(boolean_expression))
+            }
             _ => None,
         }
     }
@@ -260,7 +265,9 @@ impl<'a> Parser<'a> {
 #[cfg(test)]
 mod test {
 
-    use crate::ast::ast::Program;
+    use std::any::Any;
+
+    use crate::ast::{ast::Program, expressions::boolean::BooleanExpression};
 
     use super::*;
 
@@ -325,6 +332,66 @@ mod test {
             .map_or(false, |int_expr| int_expr.value == value)
     }
 
+    fn test_identifier_literal(expr: &dyn Expression, value: String) -> bool {
+        expr.as_any()
+            .downcast_ref::<IdentifierExpression>()
+            .map_or(false, |ident_expr| ident_expr.value == value)
+    }
+
+    fn test_boolean_literal(expr: &dyn Expression, value: bool) -> bool {
+        expr.as_any()
+            .downcast_ref::<BooleanExpression>()
+            .map_or(false, |bool_expr| bool_expr.value == value)
+    }
+
+    trait TestLiteral {
+        fn test(&self, expr: &dyn Expression) -> bool;
+    }
+
+    impl TestLiteral for usize {
+        fn test(&self, expr: &dyn Expression) -> bool {
+            test_interget_literal(expr, *self)
+        }
+    }
+    impl TestLiteral for &usize {
+        fn test(&self, expr: &dyn Expression) -> bool {
+            test_interget_literal(expr, **self)
+        }
+    }
+
+    impl TestLiteral for i32 {
+        fn test(&self, expr: &dyn Expression) -> bool {
+            test_interget_literal(expr, *self as usize)
+        }
+    }
+
+    impl TestLiteral for String {
+        fn test(&self, expr: &dyn Expression) -> bool {
+            test_identifier_literal(expr, self.clone())
+        }
+    }
+
+    impl TestLiteral for &str {
+        fn test(&self, expr: &dyn Expression) -> bool {
+            test_identifier_literal(expr, self.to_string())
+        }
+    }
+
+    impl TestLiteral for bool {
+        fn test(&self, expr: &dyn Expression) -> bool {
+            test_boolean_literal(expr, *self)
+        }
+    }
+    impl TestLiteral for &bool {
+        fn test(&self, expr: &dyn Expression) -> bool {
+            test_boolean_literal(expr, **self)
+        }
+    }
+
+    fn test_literal_expression<T: TestLiteral>(expr: &dyn Expression, expected: T) -> bool {
+        expected.test(expr)
+    }
+
     #[test]
     fn test_prefix_bang_operand() {
         let input: Vec<String> = vec!["!5;".to_string(), "-15;".to_string()];
@@ -361,60 +428,118 @@ mod test {
             assert!(test_interget_literal(right_expr.as_ref(), output_value));
         }
     }
+    fn test_infix_expression(
+        expr: &dyn Expression,
+        left: &dyn TestLiteral,
+        operator: &str,
+        right: &dyn TestLiteral,
+    ) -> bool {
+        let op_exp = match expr.as_any().downcast_ref::<InfixExpression>() {
+            Some(exp) => exp,
+            None => {
+                eprintln!("Exp is not InfixExpression got= {:?}", expr.type_id());
+                return false;
+            }
+        };
 
-    #[test]
-    fn test_infix_expressions() {
-        let input: Vec<(String, usize, String, usize)> = vec![
-            ("5 + 5".to_string(), 5, "+".to_string(), 5),
-            ("5 - 5".to_string(), 5, "-".to_string(), 5),
-            ("5 * 5".to_string(), 5, "*".to_string(), 5),
-            ("5 / 5".to_string(), 5, "/".to_string(), 5),
-            ("5 > 5".to_string(), 5, ">".to_string(), 5),
-            ("5 < 5".to_string(), 5, "<".to_string(), 5),
-            ("5 == 5".to_string(), 5, "==".to_string(), 5),
-            ("5 != 6".to_string(), 5, "!=".to_string(), 6),
-        ];
+        let left_ok = match &op_exp.left {
+            Some(left_exp) => left.test(&**left_exp),
+            None => {
+                return false;
+            }
+        };
 
-        for (index, values) in input.iter().enumerate() {
-            let (inpu, left_value, operator, right_value) = values;
-            let mut lexer = Lexer::new(inpu);
+        let right_ok = match &op_exp.right {
+            Some(right_exp) => right.test(&**right_exp),
+            None => {
+                return false;
+            }
+        };
+
+        let operator_ok = op_exp.operator == operator;
+
+        left_ok && right_ok && operator_ok
+    }
+
+    struct TestCaseInfix {
+        input: String,
+        left: Box<dyn TestLiteral>,
+        operator: String,
+        right: Box<dyn TestLiteral>,
+    }
+
+    impl TestCaseInfix {
+        pub fn new<T, U>(input: &str, left: T, operator: &str, right: U) -> Self
+        where
+            U: TestLiteral + 'static,
+            T: TestLiteral + 'static,
+        {
+            Self {
+                input: input.to_string(),
+                left: Box::new(left),
+                operator: operator.to_string(),
+                right: Box::new(right),
+            }
+        }
+
+        pub fn run_test(&self, index: usize) {
+            println!("Running test case {}: {}", index, self.input);
+
+            let mut lexer = Lexer::new(&self.input);
             let parser = Parser::new(&mut lexer);
-            let mut p = Program::new(parser);
-            p.parse_program();
-            assert_eq!(p.statements.len(), 1);
+            let mut program = Program::new(parser);
+            program.parse_program();
 
-            let statement = &p.statements[0];
+            assert_eq!(
+                program.statements.len(),
+                1,
+                "Test case {}: Expected 1 statement, got {}",
+                index,
+                program.statements.len()
+            );
 
+            let statement = &program.statements[0];
             let expr_statement = statement
                 .as_any()
                 .downcast_ref::<ExpressionStatement>()
-                .expect("Expected an expression statemnt");
+                .unwrap_or_else(|| panic!("Test case {}: Expected ExpressionStatement", index));
 
             let expression = expr_statement
                 .expression
                 .as_ref()
-                .expect("Expression should exists");
+                .unwrap_or_else(|| panic!("Test case {}: Expression should exist", index));
 
             let infix_expression = expression
                 .as_any()
                 .downcast_ref::<InfixExpression>()
-                .expect("Expected Infix Expression");
+                .unwrap_or_else(|| panic!("Test case {}: Expected InfixExpression", index));
 
-            let left_expression = infix_expression
-                .left
-                .as_ref()
-                .expect("left expression should exists");
+            assert!(test_infix_expression(
+                infix_expression,
+                &*self.left,
+                &self.operator,
+                &*self.right
+            ))
+        }
+    }
 
-            let right_expression = infix_expression
-                .right
-                .as_ref()
-                .expect("right expression should exist");
+    #[test]
+    fn test_infix_expressions() {
+        let input: Vec<TestCaseInfix> = vec![
+            TestCaseInfix::new("5 + 5", 5, "+", 5),
+            TestCaseInfix::new("5 - 5", 5, "-", 5),
+            TestCaseInfix::new("5 * 5", 5, "*", 5),
+            TestCaseInfix::new("5 / 5", 5, "/", 5),
+            TestCaseInfix::new("5 > 5", 5, ">", 5),
+            TestCaseInfix::new("5 < 5", 5, "<", 5),
+            TestCaseInfix::new("5 == 5", 5, "==", 5),
+            TestCaseInfix::new("5 != 6", 5, "!=", 6),
+            TestCaseInfix::new("true == true", true, "==", true),
+            TestCaseInfix::new("false != true", false, "!=", true),
+        ];
 
-            assert!(test_interget_literal(left_expression.as_ref(), *left_value));
-            assert!(test_interget_literal(
-                right_expression.as_ref(),
-                *right_value
-            ));
+        for (index, value) in input.iter().enumerate() {
+            value.run_test(index);
         }
     }
 
@@ -433,6 +558,10 @@ mod test {
             "5 < 4 != 3 > 4".to_string(),
             "3 + 4 * 5 == 3 * 1 + 4 * 5".to_string(),
             "3 + 4 * 5 == 3 * 1 + 4 * 5".to_string(),
+            "true;".to_string(),
+            "false;".to_string(),
+            "3 > 5 == false".to_string(),
+            "3 < 5 == true".to_string(),
         ];
         let outputs: Vec<String> = vec![
             "((-a) * b)".to_string(),
@@ -447,6 +576,10 @@ mod test {
             "((5 < 4) != (3 > 4))".to_string(),
             "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))".to_string(),
             "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))".to_string(),
+            "true".to_string(),
+            "false".to_string(),
+            "((3 > 5) == false)".to_string(),
+            "((3 < 5) == true)".to_string(),
         ];
 
         for (input, output) in inputs.iter().zip(outputs.iter()) {
@@ -461,5 +594,37 @@ mod test {
 
             assert_eq!(actual, output.clone());
         }
+    }
+
+    #[ignore]
+    #[test]
+    fn test_infix_with_function() {}
+
+    #[test]
+    fn test_boolean_expression() {
+        let input = "true;";
+        let mut lexer = Lexer::new(input);
+        let parser = Parser::new(&mut lexer);
+        let mut p = Program::new(parser);
+        p.parse_program();
+        assert_eq!(p.statements.len(), 1);
+        let statement = &p.statements[0];
+        let expr_statmet = statement
+            .as_any()
+            .downcast_ref::<ExpressionStatement>()
+            .expect("Expected ExpressionStatement");
+
+        let expression = expr_statmet
+            .expression
+            .as_ref()
+            .expect("Expression should exists");
+
+        let boolean_expression = expression
+            .as_any()
+            .downcast_ref::<BooleanExpression>()
+            .expect("Expected boolean Expression");
+
+        assert_eq!(boolean_expression.value, true);
+        assert_eq!(boolean_expression.string_representation(), "true");
     }
 }
