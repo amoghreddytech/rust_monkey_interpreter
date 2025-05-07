@@ -2,7 +2,7 @@ use crate::{ast::traits::Expression, token::token::TokenType};
 
 #[derive(Debug)]
 pub struct IdentifierExpression {
-    value: String,
+    pub value: String,
 }
 
 // maybe we pass the token to create the IdentifierExpression
