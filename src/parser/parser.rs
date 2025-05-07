@@ -536,6 +536,7 @@ mod test {
             TestCaseInfix::new("5 != 6", 5, "!=", 6),
             TestCaseInfix::new("true == true", true, "==", true),
             TestCaseInfix::new("false != true", false, "!=", true),
+            TestCaseInfix::new("false == false", false, "==", false),
         ];
 
         for (index, value) in input.iter().enumerate() {
