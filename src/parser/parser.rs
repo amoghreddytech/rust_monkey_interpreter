@@ -1,5 +1,6 @@
 use crate::ast::expressions::{
-    BooleanExpression, IdentifierExpression, InfixExpression, IntegerExpression, PrefixExpression,
+    BooleanExpression, GroupedExpression, IdentifierExpression, InfixExpression, IntegerExpression,
+    PrefixExpression,
 };
 use crate::ast::statements::{ExpressionStatement, LetStatement, ReturnStatement};
 use crate::ast::traits::{Expression, Statement};
@@ -146,6 +147,20 @@ impl<'a> Parser<'a> {
         Ok(return_statement)
     }
 
+    fn parse_grouped_expression(&mut self) -> Option<GroupedExpression> {
+        let mut grouped_expression = GroupedExpression::new(self.cur_token.clone());
+
+        self.next_token();
+
+        grouped_expression.value = self.parse_expression(PRECEDENCE::LOWEST);
+
+        if !self.peek_and_move(&TokenType::RPAREN) {
+            return None;
+        }
+
+        return Some(grouped_expression);
+    }
+
     // this function is used for bang "!" and "-"
     // the naming is pretty weird here.
     // this is actual technical debt lol
@@ -179,8 +194,8 @@ impl<'a> Parser<'a> {
             }
 
             TokenType::INT(_) => {
-                let interget_expression = IntegerExpression::new(self.cur_token.clone());
-                Some(Box::new(interget_expression))
+                let interger_expression = IntegerExpression::new(self.cur_token.clone());
+                Some(Box::new(interger_expression))
             }
 
             TokenType::BANG | TokenType::MINUS => {
@@ -191,6 +206,14 @@ impl<'a> Parser<'a> {
             TokenType::TRUE | TokenType::FALSE => {
                 let boolean_expression = BooleanExpression::new(self.cur_token.clone());
                 Some(Box::new(boolean_expression))
+            }
+
+            TokenType::LPAREN => {
+                let grouped_expression = self.parse_grouped_expression();
+                match grouped_expression {
+                    Some(exp) => Some(Box::new(exp)),
+                    None => None,
+                }
             }
             _ => None,
         }
@@ -264,8 +287,6 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod test {
-
-    use std::any::Any;
 
     use crate::ast::{ast::Program, expressions::boolean::BooleanExpression};
 
@@ -483,8 +504,6 @@ mod test {
         }
 
         pub fn run_test(&self, index: usize) {
-            println!("Running test case {}: {}", index, self.input);
-
             let mut lexer = Lexer::new(&self.input);
             let parser = Parser::new(&mut lexer);
             let mut program = Program::new(parser);
@@ -544,62 +563,74 @@ mod test {
         }
     }
 
-    #[test]
-    fn test_operator_precedence_parsing() {
-        let inputs: Vec<String> = vec![
-            "-a * b".to_string(),
-            "a + b + c".to_string(),
-            "a + b - c".to_string(),
-            "a * b * c".to_string(),
-            "a * b / c".to_string(),
-            "a + b / c".to_string(),
-            "a + b * c + d / e - f".to_string(),
-            "3 + 4; -5 * 5".to_string(),
-            "5 > 4 == 3 < 4".to_string(),
-            "5 < 4 != 3 > 4".to_string(),
-            "3 + 4 * 5 == 3 * 1 + 4 * 5".to_string(),
-            "3 + 4 * 5 == 3 * 1 + 4 * 5".to_string(),
-            "true;".to_string(),
-            "false;".to_string(),
-            "3 > 5 == false".to_string(),
-            "3 < 5 == true".to_string(),
-        ];
-        let outputs: Vec<String> = vec![
-            "((-a) * b)".to_string(),
-            "((a + b) + c)".to_string(),
-            "((a + b) - c)".to_string(),
-            "((a * b) * c)".to_string(),
-            "((a * b) / c)".to_string(),
-            "(a + (b / c))".to_string(),
-            "(((a + (b * c)) + (d / e)) - f)".to_string(),
-            "(3 + 4)((-5) * 5)".to_string(),
-            "((5 > 4) == (3 < 4))".to_string(),
-            "((5 < 4) != (3 > 4))".to_string(),
-            "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))".to_string(),
-            "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))".to_string(),
-            "true".to_string(),
-            "false".to_string(),
-            "((3 > 5) == false)".to_string(),
-            "((3 < 5) == true)".to_string(),
-        ];
+    struct TestOperatorPrecedence {
+        input: String,
+        output: String,
+    }
 
-        for (input, output) in inputs.iter().zip(outputs.iter()) {
-            let mut lexer = Lexer::new(input);
+    impl TestOperatorPrecedence {
+        pub fn new(input: &str, output: &str) -> Self {
+            Self {
+                input: input.to_string(),
+                output: output.to_string(),
+            }
+        }
+
+        pub fn run_test(&self) -> bool {
+            let mut lexer = Lexer::new(&self.input);
             let parser = Parser::new(&mut lexer);
             let mut p = Program::new(parser);
             p.parse_program();
 
             let actual = p.string();
 
-            // println!("{:#?}", p.statements);
-
-            assert_eq!(actual, output.clone());
+            if actual == self.output {
+                return true;
+            } else {
+                println!(
+                    "input : {:?}, actual : {:?}, test_case: {:?}",
+                    self.input, actual, self.output
+                );
+                return false;
+            }
         }
     }
 
-    #[ignore]
     #[test]
-    fn test_infix_with_function() {}
+    fn test_operator_precedence_parsing() {
+        let tests = vec![
+            TestOperatorPrecedence::new("-a * b", "((-a) * b)"),
+            TestOperatorPrecedence::new("a + b + c", "((a + b) + c)"),
+            TestOperatorPrecedence::new("a + b - c", "((a + b) - c)"),
+            TestOperatorPrecedence::new("a * b * c", "((a * b) * c)"),
+            TestOperatorPrecedence::new("a * b / c", "((a * b) / c)"),
+            TestOperatorPrecedence::new("a + b / c", "(a + (b / c))"),
+            TestOperatorPrecedence::new("a + b * c + d / e - f", "(((a + (b * c)) + (d / e)) - f)"),
+            TestOperatorPrecedence::new("3 + 4; -5 * 5", "(3 + 4)((-5) * 5)"),
+            TestOperatorPrecedence::new("5 > 4 == 3 < 4", "((5 > 4) == (3 < 4))"),
+            TestOperatorPrecedence::new("5 < 4 != 3 > 4", "((5 < 4) != (3 > 4))"),
+            TestOperatorPrecedence::new(
+                "3 + 4 * 5 == 3 * 1 + 4 * 5",
+                "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+            ),
+            TestOperatorPrecedence::new(
+                "3 + 4 * 5 == 3 * 1 + 4 * 5",
+                "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+            ),
+            TestOperatorPrecedence::new("true;", "true"),
+            TestOperatorPrecedence::new("false;", "false"),
+            TestOperatorPrecedence::new("3 > 5 == false", "((3 > 5) == false)"),
+            TestOperatorPrecedence::new("3 < 5 == true", "((3 < 5) == true)"),
+            TestOperatorPrecedence::new("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
+            TestOperatorPrecedence::new("(5 + 5) * 2", "((5 + 5) * 2)"),
+            TestOperatorPrecedence::new("2 / (5 + 5)", "(2 / (5 + 5))"),
+            TestOperatorPrecedence::new("-(5 + 5)", "(-(5 + 5))"),
+            TestOperatorPrecedence::new("!(true == true)", "(!(true == true))"),
+        ];
+        for test in tests.iter() {
+            assert!(test.run_test());
+        }
+    }
 
     #[test]
     fn test_boolean_expression() {
