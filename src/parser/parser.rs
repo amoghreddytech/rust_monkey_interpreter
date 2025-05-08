@@ -1,6 +1,6 @@
 use crate::ast::expressions::{
-    BooleanExpression, ConditionalExpression, GroupedExpression, IdentifierExpression,
-    InfixExpression, IntegerExpression, PrefixExpression,
+    BooleanExpression, ConditionalExpression, FunctionExpression, GroupedExpression,
+    IdentifierExpression, InfixExpression, IntegerExpression, PrefixExpression,
 };
 use crate::ast::statements::{BlockStatement, ExpressionStatement, LetStatement, ReturnStatement};
 use crate::ast::traits::{Expression, Statement};
@@ -223,6 +223,56 @@ impl<'a> Parser<'a> {
             }
         }
     }
+
+    fn parse_function_parameters(&mut self) -> Option<Vec<IdentifierExpression>> {
+        let mut identifiers: Vec<IdentifierExpression> = vec![];
+
+        if self.compare_next_token(&TokenType::RPAREN) {
+            self.next_token();
+            return Some(identifiers);
+        }
+
+        self.next_token();
+
+        let ident = IdentifierExpression::new(self.cur_token.clone());
+
+        identifiers.push(ident);
+
+        while self.compare_next_token(&TokenType::COMMA) {
+            self.next_token();
+            self.next_token();
+            let ident = IdentifierExpression::new(self.cur_token.clone());
+            identifiers.push(ident);
+        }
+
+        if !self.peek_and_move(&TokenType::RPAREN) {
+            return None;
+        }
+
+        Some(identifiers)
+    }
+
+    fn parse_function_expression(&mut self) -> Option<FunctionExpression> {
+        // you're at fn
+        let starting_token = self.cur_token.clone();
+
+        if !self.peek_and_move(&TokenType::LPAREN) {
+            return None;
+        }
+
+        let params = self.parse_function_parameters();
+
+        if !self.peek_and_move(&TokenType::LBRACE) {
+            return None;
+        }
+
+        let body = self.parse_block_statement();
+
+        let function_expression = FunctionExpression::new(starting_token, params?, body);
+
+        Some(function_expression)
+    }
+
     // this function is used for bang "!" and "-"
     // the naming is pretty weird here.
     // this is actual technical debt lol
@@ -281,6 +331,14 @@ impl<'a> Parser<'a> {
             TokenType::IF => {
                 let if_expression = self.parse_if_expression();
                 match if_expression {
+                    Some(exp) => Some(Box::new(exp)),
+                    None => None,
+                }
+            }
+
+            TokenType::FUNCTION => {
+                let function_expression = self.parse_function_expression();
+                match function_expression {
                     Some(exp) => Some(Box::new(exp)),
                     None => None,
                 }
@@ -357,8 +415,6 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod test {
-
-    use anyhow::Context;
 
     use crate::ast::{ast::Program, expressions::boolean::BooleanExpression};
 
@@ -888,5 +944,48 @@ mod test {
 
         assert_eq!(boolean_expression.value, true);
         assert_eq!(boolean_expression.string_representation(), "true");
+    }
+
+    #[test]
+    fn test_function_parameter_parsing() {
+        let inputs = vec!["fn() {};", "fn(x) {};", "fn(x, y, z) {};"];
+        let outputs = vec![vec![], vec!["x"], vec!["x", "y", "z"]];
+
+        for (input, output) in inputs.iter().zip(outputs) {
+            let mut lexer = Lexer::new(input);
+            let parser = Parser::new(&mut lexer);
+            let mut p = Program::new(parser);
+            p.parse_program();
+            let statement = &p.statements[0];
+
+            let expr_statmet = statement
+                .as_any()
+                .downcast_ref::<ExpressionStatement>()
+                .expect("Expected ExpressionStatement");
+
+            let expression = expr_statmet
+                .expression
+                .as_ref()
+                .expect("Expression should exists");
+
+            let function_expression = expression
+                .as_any()
+                .downcast_ref::<FunctionExpression>()
+                .expect("Expected Function Expression");
+
+            assert_eq!(function_expression.parameters.len(), output.len());
+
+            for (index, ident) in output.iter().enumerate() {
+                let ident_expression = function_expression.parameters[index]
+                    .as_any()
+                    .downcast_ref::<IdentifierExpression>()
+                    .expect("Expected an Identifier Expression");
+
+                test_identifier_literal(ident_expression, ident.to_string());
+            }
+        }
+
+        // assert_eq!(boolean_expression.value, true);
+        // assert_eq!(boolean_expression.string_representation(), "true");
     }
 }
