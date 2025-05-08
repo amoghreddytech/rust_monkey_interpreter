@@ -1,8 +1,8 @@
 use crate::ast::expressions::{
-    BooleanExpression, GroupedExpression, IdentifierExpression, InfixExpression, IntegerExpression,
-    PrefixExpression,
+    BooleanExpression, ConditionalExpression, GroupedExpression, IdentifierExpression,
+    InfixExpression, IntegerExpression, PrefixExpression,
 };
-use crate::ast::statements::{ExpressionStatement, LetStatement, ReturnStatement};
+use crate::ast::statements::{BlockStatement, ExpressionStatement, LetStatement, ReturnStatement};
 use crate::ast::traits::{Expression, Statement};
 use crate::lexer::lexer::Lexer;
 use crate::token::token::{PRECEDENCE, TokenType};
@@ -161,6 +161,68 @@ impl<'a> Parser<'a> {
         return Some(grouped_expression);
     }
 
+    fn parse_block_statement(&mut self) -> BlockStatement {
+        let mut block = BlockStatement::new(self.cur_token.clone());
+        self.next_token();
+
+        while !self.compare_cur_token(&TokenType::RBRACE)
+            && !self.compare_cur_token(&TokenType::EOF)
+        {
+            let stmt = self.parse_statement();
+            match stmt {
+                Some(s) => block.statements.push(s),
+                None => {}
+            };
+
+            self.next_token();
+        }
+
+        block
+    }
+
+    fn parse_if_expression(&mut self) -> Option<ConditionalExpression> {
+        if !self.peek_and_move(&TokenType::LPAREN) {
+            return None;
+        }
+
+        self.next_token();
+
+        let condition = self.parse_expression(PRECEDENCE::LOWEST);
+
+        if !self.peek_and_move(&TokenType::RPAREN) {
+            return None;
+        }
+
+        if !self.peek_and_move(&TokenType::LBRACE) {
+            return None;
+        }
+
+        let consequence = self.parse_block_statement();
+
+        let alternative: Option<BlockStatement> = if self.next_token == TokenType::ELSE {
+            self.next_token();
+            if !self.peek_and_move(&TokenType::LBRACE) {
+                return None;
+            }
+
+            Some(self.parse_block_statement())
+        } else {
+            None
+        };
+
+        match condition {
+            Some(condition) => Some(ConditionalExpression::new(
+                TokenType::IF,
+                condition,
+                consequence,
+                alternative,
+            )),
+            None => {
+                eprintln!("There is no condition in the IfConditional Struct");
+                None
+            }
+        }
+    }
     // this function is used for bang "!" and "-"
     // the naming is pretty weird here.
     // this is actual technical debt lol
@@ -211,6 +273,14 @@ impl<'a> Parser<'a> {
             TokenType::LPAREN => {
                 let grouped_expression = self.parse_grouped_expression();
                 match grouped_expression {
+                    Some(exp) => Some(Box::new(exp)),
+                    None => None,
+                }
+            }
+
+            TokenType::IF => {
+                let if_expression = self.parse_if_expression();
+                match if_expression {
                     Some(exp) => Some(Box::new(exp)),
                     None => None,
                 }
@@ -287,6 +357,8 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod test {
+
+    use anyhow::Context;
 
     use crate::ast::{ast::Program, expressions::boolean::BooleanExpression};
 
@@ -449,8 +521,161 @@ mod test {
             assert!(test_interget_literal(right_expr.as_ref(), output_value));
         }
     }
+
+    #[test]
+    fn test_if_expression() {
+        let input = "if (x < y) { x }";
+        let mut lexer = Lexer::new(input);
+        let parser = Parser::new(&mut lexer);
+        let mut p = Program::new(parser);
+        p.parse_program();
+        assert_eq!(p.statements.len(), 1);
+        let statement = &p.statements[0];
+        let expr_statement = statement
+            .as_any()
+            .downcast_ref::<ExpressionStatement>()
+            .expect("Expected ExpressionStatement");
+
+        let expression = expr_statement
+            .expression
+            .as_ref()
+            .expect("Expression should exists");
+
+        let conditional_expression = expression
+            .as_any()
+            .downcast_ref::<ConditionalExpression>()
+            .expect("Expected Conditional Expression");
+
+        let infix_expression_condition = conditional_expression
+            .condition
+            .as_any()
+            .downcast_ref::<InfixExpression>()
+            .expect("Exprected an infix expression");
+
+        assert!(test_infix_expression(
+            infix_expression_condition,
+            &"x",
+            &"<",
+            &"y"
+        ));
+
+        let consequence_statements = &conditional_expression.consequence.statements;
+        assert_eq!(consequence_statements.len(), 1);
+
+        let consequece_statement = &consequence_statements[0];
+        let expr_statement_again = consequece_statement
+            .as_any()
+            .downcast_ref::<ExpressionStatement>()
+            .expect("Expected ExpressionStatement");
+
+        let expression_again = expr_statement_again
+            .expression
+            .as_ref()
+            .expect("Expression should exists");
+
+        let literal_expression = expression_again
+            .as_any()
+            .downcast_ref::<IdentifierExpression>()
+            .expect("Expected Conditional Expression");
+
+        assert!(test_identifier_literal(literal_expression, "x".to_string()));
+
+        match &conditional_expression.alternative {
+            Some(_) => {
+                panic!("This should not be None")
+            }
+            None => {}
+        }
+    }
+
+    #[test]
+    fn test_if_else_condition() {
+        let input = "if (x < y) { x } else { y }";
+        let mut lexer = Lexer::new(input);
+        let parser = Parser::new(&mut lexer);
+        let mut p = Program::new(parser);
+        p.parse_program();
+        assert_eq!(p.statements.len(), 1);
+        let statement = &p.statements[0];
+        let expr_statement = statement
+            .as_any()
+            .downcast_ref::<ExpressionStatement>()
+            .expect("Expected ExpressionStatement");
+
+        let expression = expr_statement
+            .expression
+            .as_ref()
+            .expect("Expression should exists");
+
+        let conditional_expression = expression
+            .as_any()
+            .downcast_ref::<ConditionalExpression>()
+            .expect("Expected Conditional Expression");
+
+        let infix_expression_condition = conditional_expression
+            .condition
+            .as_any()
+            .downcast_ref::<InfixExpression>()
+            .expect("Exprected an infix expression");
+
+        assert!(test_infix_expression(
+            infix_expression_condition,
+            &"x",
+            &"<",
+            &"y"
+        ));
+
+        let consequence_statements = &conditional_expression.consequence.statements;
+        assert_eq!(consequence_statements.len(), 1);
+
+        let consequece_statement = &consequence_statements[0];
+        let expr_statement_again = consequece_statement
+            .as_any()
+            .downcast_ref::<ExpressionStatement>()
+            .expect("Expected ExpressionStatement");
+
+        let expression_again = expr_statement_again
+            .expression
+            .as_ref()
+            .expect("Expression should exists");
+
+        let literal_expression = expression_again
+            .as_any()
+            .downcast_ref::<IdentifierExpression>()
+            .expect("Expected Conditional Expression");
+
+        assert!(test_identifier_literal(literal_expression, "x".to_string()));
+
+        match &conditional_expression.alternative {
+            Some(exp) => {
+                let alternative_statements = &exp.statements;
+                assert_eq!(alternative_statements.len(), 1);
+                let alternative_statement = &exp.statements[0];
+                let expr_statement_again = alternative_statement
+                    .as_any()
+                    .downcast_ref::<ExpressionStatement>()
+                    .expect("Expected ExpressionStatement");
+
+                let expression_again = expr_statement_again
+                    .expression
+                    .as_ref()
+                    .expect("Expression should exists");
+
+                let literal_expression = expression_again
+                    .as_any()
+                    .downcast_ref::<IdentifierExpression>()
+                    .expect("Expected Conditional Expression");
+
+                assert!(test_identifier_literal(literal_expression, "y".to_string()));
+            }
+            None => {
+                panic!("32131223")
+            }
+        }
+    }
+
     fn test_infix_expression(
-        expr: &dyn Expression,
+        expr: &InfixExpression,
         left: &dyn TestLiteral,
         operator: &str,
         right: &dyn TestLiteral,
@@ -458,7 +683,7 @@ mod test {
         let op_exp = match expr.as_any().downcast_ref::<InfixExpression>() {
             Some(exp) => exp,
             None => {
-                eprintln!("Exp is not InfixExpression got= {:?}", expr.type_id());
+                eprintln!("Exp is not InfixExpression got= {:?}", expr);
                 return false;
             }
         };
@@ -531,7 +756,12 @@ mod test {
             let infix_expression = expression
                 .as_any()
                 .downcast_ref::<InfixExpression>()
-                .unwrap_or_else(|| panic!("Test case {}: Expected InfixExpression", index));
+                .unwrap_or_else(|| {
+                    panic!(
+                        "Test case {}: Expected InfixExpression got {:?}",
+                        index, expression
+                    )
+                });
 
             assert!(test_infix_expression(
                 infix_expression,
