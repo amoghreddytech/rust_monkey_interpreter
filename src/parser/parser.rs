@@ -608,12 +608,10 @@ mod test {
             .downcast_ref::<InfixExpression>()
             .expect("Exprected an infix expression");
 
-        assert!(test_infix_expression(
-            infix_expression_condition,
-            &"x",
-            &"<",
-            &"y"
-        ));
+        let infix_tester = TestCaseInfix::new(&infix_expression_condition, &"x", &"<", &"y");
+
+        assert!(infix_tester.test_infix_expression());
+        //
 
         let consequence_statements = &conditional_expression.consequence.statements;
         assert_eq!(consequence_statements.len(), 1);
@@ -674,12 +672,9 @@ mod test {
             .downcast_ref::<InfixExpression>()
             .expect("Exprected an infix expression");
 
-        assert!(test_infix_expression(
-            infix_expression_condition,
-            &"x",
-            &"<",
-            &"y"
-        ));
+        let infix_tester = TestCaseInfix::new(&infix_expression_condition, &"x", &"<", &"y");
+
+        assert!(infix_tester.test_infix_expression());
 
         let consequence_statements = &conditional_expression.consequence.statements;
         assert_eq!(consequence_statements.len(), 1);
@@ -730,122 +725,103 @@ mod test {
         }
     }
 
-    fn test_infix_expression(
-        expr: &InfixExpression,
-        left: &dyn TestLiteral,
-        operator: &str,
-        right: &dyn TestLiteral,
-    ) -> bool {
-        let op_exp = match expr.as_any().downcast_ref::<InfixExpression>() {
-            Some(exp) => exp,
-            None => {
-                eprintln!("Exp is not InfixExpression got= {:?}", expr);
-                return false;
-            }
-        };
-
-        let left_ok = match &op_exp.left {
-            Some(left_exp) => left.test(&**left_exp),
-            None => {
-                return false;
-            }
-        };
-
-        let right_ok = match &op_exp.right {
-            Some(right_exp) => right.test(&**right_exp),
-            None => {
-                return false;
-            }
-        };
-
-        let operator_ok = op_exp.operator == operator;
-
-        left_ok && right_ok && operator_ok
+    struct TestCaseInfix<'a> {
+        input: &'a InfixExpression,
+        left: &'a dyn TestLiteral,
+        operator: &'a str,
+        right: &'a dyn TestLiteral,
     }
 
-    struct TestCaseInfix {
-        input: String,
-        left: Box<dyn TestLiteral>,
-        operator: String,
-        right: Box<dyn TestLiteral>,
-    }
-
-    impl TestCaseInfix {
-        pub fn new<T, U>(input: &str, left: T, operator: &str, right: U) -> Self
-        where
-            U: TestLiteral + 'static,
-            T: TestLiteral + 'static,
-        {
+    impl<'a> TestCaseInfix<'a> {
+        pub fn new(
+            input: &'a InfixExpression,
+            left: &'a dyn TestLiteral,
+            operator: &'a str,
+            right: &'a dyn TestLiteral,
+        ) -> Self {
             Self {
-                input: input.to_string(),
-                left: Box::new(left),
-                operator: operator.to_string(),
-                right: Box::new(right),
+                input,
+                left,
+                operator,
+                right,
             }
         }
 
-        pub fn run_test(&self, index: usize) {
-            let mut lexer = Lexer::new(&self.input);
-            let parser = Parser::new(&mut lexer);
-            let mut program = Program::new(parser);
-            program.parse_program();
+        fn test_infix_expression(
+            self,
+            // left: &dyn TestLiteral,
+            // operator: &str,
+            // right: &dyn TestLiteral,
+        ) -> bool {
+            let op_exp = match self.input.as_any().downcast_ref::<InfixExpression>() {
+                Some(exp) => exp,
+                None => {
+                    eprintln!("Exp is not InfixExpression got= {:?}", self.input);
+                    return false;
+                }
+            };
 
-            assert_eq!(
-                program.statements.len(),
-                1,
-                "Test case {}: Expected 1 statement, got {}",
-                index,
-                program.statements.len()
-            );
+            let left_ok = match &op_exp.left {
+                Some(left_exp) => self.left.test(&**left_exp),
+                None => {
+                    return false;
+                }
+            };
 
-            let statement = &program.statements[0];
-            let expr_statement = statement
-                .as_any()
-                .downcast_ref::<ExpressionStatement>()
-                .unwrap_or_else(|| panic!("Test case {}: Expected ExpressionStatement", index));
+            let right_ok = match &op_exp.right {
+                Some(right_exp) => self.right.test(&**right_exp),
+                None => {
+                    return false;
+                }
+            };
 
-            let expression = expr_statement
-                .expression
-                .as_ref()
-                .unwrap_or_else(|| panic!("Test case {}: Expression should exist", index));
+            let operator_ok = op_exp.operator == self.operator;
 
-            let infix_expression = expression
-                .as_any()
-                .downcast_ref::<InfixExpression>()
-                .unwrap_or_else(|| {
-                    panic!(
-                        "Test case {}: Expected InfixExpression got {:?}",
-                        index, expression
-                    )
-                });
-
-            assert!(test_infix_expression(
-                infix_expression,
-                &*self.left,
-                &self.operator,
-                &*self.right
-            ))
+            left_ok && right_ok && operator_ok
         }
     }
 
     #[test]
     fn test_infix_expressions() {
-        let input: Vec<TestCaseInfix> = vec![
-            TestCaseInfix::new("5 + 5", 5, "+", 5),
-            TestCaseInfix::new("5 - 5", 5, "-", 5),
-            TestCaseInfix::new("5 * 5", 5, "*", 5),
-            TestCaseInfix::new("5 / 5", 5, "/", 5),
-            TestCaseInfix::new("5 > 5", 5, ">", 5),
-            TestCaseInfix::new("5 < 5", 5, "<", 5),
-            TestCaseInfix::new("5 == 5", 5, "==", 5),
-            TestCaseInfix::new("5 != 6", 5, "!=", 6),
-            TestCaseInfix::new("true == true", true, "==", true),
-            TestCaseInfix::new("false != true", false, "!=", true),
-            TestCaseInfix::new("false == false", false, "==", false),
+        let inputs: Vec<(&str, &dyn TestLiteral, &str, &dyn TestLiteral)> = vec![
+            ("5 + 5", &5, "+", &5),
+            ("5 - 5", &5, "-", &5),
+            ("5 * 5", &5, "*", &5),
+            ("5 / 5", &5, "/", &5),
+            ("5 > 5", &5, ">", &5),
+            ("5 == 5", &5, "==", &5),
+            ("5 != 6", &5, "!=", &6),
+            ("true == true", &true, "==", &true),
+            ("false == false", &false, "==", &false),
+            ("true != true", &true, "!=", &true),
         ];
 
-        for (index, value) in input.iter().enumerate() {
-            value.run_test(index);
+        for input in inputs {
+            let (input, left, op, right) = input;
+            let mut lexer = Lexer::new(input);
+            let parser = Parser::new(&mut lexer);
+            let mut p = Program::new(parser);
+            p.parse_program();
+            assert_eq!(p.statements.len(), 1);
+            let statement = &p.statements[0];
+            let expr_statement = statement
+                .as_any()
+                .downcast_ref::<ExpressionStatement>()
+                .expect("Expected ExpressionStatement");
+
+            let expression = expr_statement
+                .expression
+                .as_ref()
+                .expect("Expression should exists");
+
+            let infix_expression_condition = expression
+                .as_any()
+                .downcast_ref::<InfixExpression>()
+                .expect("Exprected an infix expression");
+
+            let infix_tester = TestCaseInfix::new(&infix_expression_condition, left, op, right);
+
+            assert!(infix_tester.test_infix_expression());
         }
     }
 
