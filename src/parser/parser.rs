@@ -416,7 +416,10 @@ impl<'a> Parser<'a> {
 #[cfg(test)]
 mod test {
 
-    use crate::ast::{ast::Program, expressions::boolean::BooleanExpression};
+    use crate::ast::{
+        ast::Program,
+        expressions::{boolean::BooleanExpression, infix},
+    };
 
     use super::*;
 
@@ -957,11 +960,65 @@ mod test {
                     .downcast_ref::<IdentifierExpression>()
                     .expect("Expected an Identifier Expression");
 
-                test_identifier_literal(ident_expression, ident.to_string());
+                assert!(test_identifier_literal(ident_expression, ident.to_string()));
             }
         }
+    }
 
-        // assert_eq!(boolean_expression.value, true);
-        // assert_eq!(boolean_expression.string_representation(), "true");
+    #[test]
+    fn test_function_literal() {
+        let input = "fn(x,y) { x + y; }";
+        let mut lexer = Lexer::new(input);
+        let parser = Parser::new(&mut lexer);
+        let mut p = Program::new(parser);
+        p.parse_program();
+        assert_eq!(p.statements.len(), 1);
+        let statement = &p.statements[0];
+
+        let expr_statmet = statement
+            .as_any()
+            .downcast_ref::<ExpressionStatement>()
+            .expect("Expected ExpressionStatement");
+
+        let expression = expr_statmet
+            .expression
+            .as_ref()
+            .expect("Expression should exists");
+
+        let function_statmet = expression
+            .as_any()
+            .downcast_ref::<FunctionExpression>()
+            .expect("Expected FunctionExpression");
+
+        assert_eq!(function_statmet.parameters.len(), 2);
+
+        assert!(test_identifier_literal(
+            &function_statmet.parameters[0],
+            "x".to_string()
+        ));
+        assert!(test_identifier_literal(
+            &function_statmet.parameters[1],
+            "y".to_string()
+        ));
+
+        assert_eq!(function_statmet.body.statements.len(), 1);
+
+        let expr_statmet = function_statmet.body.statements[0]
+            .as_any()
+            .downcast_ref::<ExpressionStatement>()
+            .expect("Expected ExpressionStatement");
+
+        let expression = expr_statmet
+            .expression
+            .as_ref()
+            .expect("Expression should exists");
+
+        let infix_expression = expression
+            .as_any()
+            .downcast_ref::<InfixExpression>()
+            .expect("Expected InfixExpression");
+
+        let infix_test = TestCaseInfix::new(&infix_expression, &"x", &"+", &"y");
+        assert!(infix_test.test_infix_expression());
     }
 }
