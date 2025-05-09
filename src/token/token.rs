@@ -114,6 +114,7 @@ impl TokenType {
             TokenType::LT | TokenType::GT => PRECEDENCE::LESSGREATER,
             TokenType::PLUS | TokenType::MINUS => PRECEDENCE::SUM,
             TokenType::SLASH | TokenType::ASTERISK => PRECEDENCE::PRODUCT,
+            TokenType::LPAREN => PRECEDENCE::CALL,
             _ => PRECEDENCE::LOWEST,
         }
     }

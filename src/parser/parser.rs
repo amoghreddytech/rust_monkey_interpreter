@@ -1,6 +1,6 @@
 use crate::ast::expressions::{
-    BooleanExpression, ConditionalExpression, FunctionExpression, GroupedExpression,
-    IdentifierExpression, InfixExpression, IntegerExpression, PrefixExpression,
+    BooleanExpression, CallExpression, ConditionalExpression, FunctionExpression,
+    GroupedExpression, IdentifierExpression, InfixExpression, IntegerExpression, PrefixExpression,
 };
 use crate::ast::statements::{BlockStatement, ExpressionStatement, LetStatement, ReturnStatement};
 use crate::ast::traits::{Expression, Statement};
@@ -273,9 +273,43 @@ impl<'a> Parser<'a> {
         Some(function_expression)
     }
 
-    // this function is used for bang "!" and "-"
-    // the naming is pretty weird here.
-    // this is actual technical debt lol
+    fn parse_call_arguments(&mut self) -> Option<Vec<Box<dyn Expression>>> {
+        let mut arguments = vec![];
+
+        if self.compare_next_token(&TokenType::RPAREN) {
+            self.next_token();
+            return Some(arguments);
+        }
+
+        self.next_token();
+
+        arguments.push(self.parse_expression(PRECEDENCE::LOWEST)?);
+
+        while self.compare_next_token(&TokenType::COMMA) {
+            self.next_token();
+            self.next_token();
+            arguments.push(self.parse_expression(PRECEDENCE::LOWEST)?);
+        }
+
+        if !self.peek_and_move(&TokenType::RPAREN) {
+            return None;
+        }
+
+        Some(arguments)
+    }
+
+    fn parse_call_expression(
+        &mut self,
+        function: Box<dyn Expression>,
+    ) -> Option<Box<CallExpression>> {
+        let mut call_expression = CallExpression::new(self.cur_token.clone(), function);
+
+        if let Some(call_arguments) = self.parse_call_arguments() {
+            call_expression.arguments = call_arguments;
+        }
+        Some(Box::new(call_expression))
+    }
+
     fn parse_prefix_expression_bang_and_minus(&mut self) -> PrefixExpression {
         let mut expression = PrefixExpression::new(self.cur_token.clone());
 
@@ -366,6 +400,10 @@ impl<'a> Parser<'a> {
                 | TokenType::GT => {
                     self.next_token();
                     self.parse_infix_expression(left)?
+                }
+                TokenType::LPAREN => {
+                    self.next_token();
+                    self.parse_call_expression(left)?
                 }
                 _ => break,
             };
@@ -1020,5 +1058,59 @@ mod test {
 
         let infix_test = TestCaseInfix::new(&infix_expression, &"x", &"+", &"y");
         assert!(infix_test.test_infix_expression());
+    }
+
+    #[test]
+    fn test_call_expression() {
+        let input = "add(1, 2 * 3, 4 + 5);";
+        let mut lexer = Lexer::new(input);
+        let parser = Parser::new(&mut lexer);
+        let mut p = Program::new(parser);
+        p.parse_program();
+        assert_eq!(p.statements.len(), 1);
+
+        let statement = &p.statements[0];
+        let expr_statmet = statement
+            .as_any()
+            .downcast_ref::<ExpressionStatement>()
+            .expect("Expected ExpressionStatement");
+
+        let expression = expr_statmet
+            .expression
+            .as_ref()
+            .expect("Expression should exists");
+
+        let call_expression = expression
+            .as_any()
+            .downcast_ref::<CallExpression>()
+            .expect("Expression should be a CallExpression");
+
+        let identifier_expression = call_expression
+            .function
+            .as_any()
+            .downcast_ref::<IdentifierExpression>()
+            .expect("FAILED!!!");
+
+        assert!(test_identifier_literal(
+            identifier_expression,
+            "add".to_string()
+        ));
+
+        assert_eq!(call_expression.arguments.len(), 3);
+
+        let first_expression = &call_expression.arguments[0];
+        let second_expression = call_expression.arguments[1]
+            .as_any()
+            .downcast_ref::<InfixExpression>()
+            .expect("Exprected an InfixExpression");
+        let third_expression = call_expression.arguments[2]
+            .as_any()
+            .downcast_ref::<InfixExpression>()
+            .expect("Exprected an InfixExpression");
+        let second_test = TestCaseInfix::new(second_expression, &2, &"*", &3);
+        let third_test = TestCaseInfix::new(third_expression, &4, &"+", &5);
+        test_literal_expression(&**first_expression, 1);
+        assert!(second_test.test_infix_expression());
+        assert!(third_test.test_infix_expression());
     }
 }

@@ -1,4 +1,5 @@
 pub mod boolean;
+pub mod call;
 pub mod conditional;
 pub mod function;
 pub mod grouped;
@@ -8,6 +9,7 @@ pub mod integer;
 pub mod prefix;
 
 pub use boolean::BooleanExpression;
+pub use call::CallExpression;
 pub use conditional::ConditionalExpression;
 pub use function::FunctionExpression;
 pub use grouped::GroupedExpression;
