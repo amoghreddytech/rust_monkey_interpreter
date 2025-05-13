@@ -1,4 +1,4 @@
-use crate::{ast::traits::Expression, token::token::TokenType};
+use crate::{ast::traits::Expression, ast::traits::Node, token::token::TokenType};
 
 #[derive(Debug)]
 pub struct IntegerExpression {
@@ -16,12 +16,14 @@ impl IntegerExpression {
     }
 }
 
+impl Node for IntegerExpression {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
 impl Expression for IntegerExpression {
     fn string_representation(&self) -> String {
         self.value.to_string()
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 }

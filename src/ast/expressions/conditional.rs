@@ -1,5 +1,5 @@
 use crate::ast::statements::BlockStatement;
-use crate::ast::traits::Statement;
+use crate::ast::traits::{Node, Statement};
 use crate::{ast::traits::Expression, token::token::TokenType};
 
 #[derive(Debug)]
@@ -25,6 +25,12 @@ impl ConditionalExpression {
     }
 }
 
+impl Node for ConditionalExpression {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
 impl Expression for ConditionalExpression {
     fn string_representation(&self) -> String {
         let mut buffer = String::new();
@@ -40,9 +46,5 @@ impl Expression for ConditionalExpression {
         }
 
         buffer
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 }

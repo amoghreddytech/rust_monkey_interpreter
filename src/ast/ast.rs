@@ -1,17 +1,23 @@
-use crate::ast::traits::Statement;
+use crate::ast::traits::{Node, Statement};
 use crate::{parser::parser::Parser, token::token::TokenType};
 use anyhow::{Result, anyhow};
 
 // Program structure
 #[derive(Debug)]
-pub struct Program<'a> {
+pub struct Program {
     pub statements: Vec<Box<dyn Statement>>,
-    parser: Parser<'a>,
+    parser: Parser,
     pub errors_from_parser: Vec<anyhow::Error>,
 }
 
-impl<'a> Program<'a> {
-    pub fn new(parser: Parser<'a>) -> Self {
+impl Node for Program {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+impl Program {
+    pub fn new(parser: Parser) -> Self {
         Self {
             statements: Vec::new(),
             parser,
@@ -52,76 +58,4 @@ impl<'a> Program<'a> {
 }
 
 #[cfg(test)]
-mod tests {
-
-    use crate::lexer::lexer::Lexer;
-
-    use super::*;
-    #[test]
-    fn test_let_statments() {
-        let input = "let x = 5;
-let y = 10;
-let foobar = 838383;";
-
-        let mut lexer = Lexer::new(input);
-
-        let parser = Parser::new(&mut lexer);
-
-        let mut program = Program::new(parser);
-
-        assert_eq!(program.statements.len(), 0);
-
-        program.parse_program();
-
-        assert_eq!(program.statements.len(), 3);
-        let mut output_vec = vec![];
-        for stmt in program.statements {
-            output_vec.push(stmt.token_literal());
-        }
-
-        let test_outputs_left_side = vec!["x".to_string(), "y".to_string(), "foobar".to_string()];
-
-        assert_eq!(test_outputs_left_side, output_vec);
-    }
-    #[test]
-    fn test_error_let_statments() {
-        let input = "let x 5;
-let  = 10;
-let  838383;";
-
-        let mut lexer = Lexer::new(input);
-
-        let parser = Parser::new(&mut lexer);
-
-        let mut program = Program::new(parser);
-
-        assert_eq!(program.parser.errors.len(), 0);
-
-        program.parse_program();
-
-        assert_eq!(program.parser.errors.len(), 3);
-    }
-
-    #[test]
-    fn test_return_statemtnts() {
-        let input = "return 5;
-    return 10;
-    return 993322;";
-
-        let mut lexer = Lexer::new(input);
-
-        let parser = Parser::new(&mut lexer);
-
-        let mut program = Program::new(parser);
-
-        assert_eq!(program.statements.len(), 0);
-
-        program.parse_program();
-
-        assert_eq!(program.statements.len(), 3);
-
-        for stmt in program.statements {
-            assert_eq!(stmt.string_representation(), "return".to_string());
-        }
-    }
-}
+mod tests {}

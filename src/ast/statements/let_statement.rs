@@ -1,17 +1,23 @@
-use crate::ast::traits::{Expression, Statement};
+use crate::{
+    ast::{
+        expressions::IdentifierExpression,
+        traits::{Expression, Node, Statement},
+    },
+    token::token::TokenType,
+};
 
 #[derive(Debug)]
 pub struct LetStatement {
-    name: String,
-    value: Option<Box<dyn Expression>>, // This could also be Vec<T> later let's see
+    pub token: TokenType,
+    pub name: IdentifierExpression,
+    pub value: Option<Box<dyn Expression>>, // This could also be Vec<T> later let's see
 }
 
-impl LetStatement {
-    fn token_literal(&self) -> String {
-        self.name.clone()
+impl Node for LetStatement {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
-
 impl Statement for LetStatement {
     fn string_representation(&self) -> String {
         let mut buffer = String::new();
@@ -26,17 +32,23 @@ impl Statement for LetStatement {
         buffer
     }
 
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
     fn token_literal(&self) -> String {
-        self.name.clone()
+        "let".to_string()
     }
 }
 
 impl LetStatement {
-    pub fn new(name: String, value: Option<Box<dyn Expression>>) -> Self {
-        Self { name, value }
+    pub fn new(
+        token: TokenType,
+        name: IdentifierExpression,
+        value: Option<Box<dyn Expression>>,
+    ) -> Self {
+        Self { token, name, value }
     }
 }
+
+// type LestStatment {
+// token : Tokentype,
+// name: *Identifier
+// value : Expression
+// }

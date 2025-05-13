@@ -1,4 +1,4 @@
-use crate::{ast::traits::Expression, token::token::TokenType};
+use crate::{ast::traits::Expression, ast::traits::Node, token::token::TokenType};
 
 // Opertor is a string that will either contain "!" or "-"
 #[derive(Debug)]
@@ -6,6 +6,12 @@ pub struct PrefixExpression {
     pub token: TokenType,
     pub operator: String,
     pub right: Option<Box<dyn Expression>>,
+}
+
+impl Node for PrefixExpression {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 impl PrefixExpression {
@@ -41,9 +47,5 @@ impl Expression for PrefixExpression {
         } else {
             "(".to_string() + "None" + &self.operator.clone() + ")"
         }
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 }

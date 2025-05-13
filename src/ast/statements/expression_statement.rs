@@ -1,11 +1,16 @@
-use crate::ast::traits::{Expression, Statement};
-use crate::parser::parser::Parser;
+use crate::ast::traits::{Expression, Node, Statement};
 use crate::token::token::TokenType;
 
 #[derive(Debug)]
 pub struct ExpressionStatement {
     pub token: TokenType, // first token of the expression
     pub expression: Option<Box<dyn Expression>>,
+}
+
+impl Node for ExpressionStatement {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 impl Statement for ExpressionStatement {
@@ -16,10 +21,6 @@ impl Statement for ExpressionStatement {
         }
 
         buffer
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 
     fn token_literal(&self) -> String {

@@ -1,9 +1,15 @@
-use crate::ast::traits::{Expression, Statement};
+use crate::ast::traits::{Expression, Node, Statement};
 
 #[derive(Debug)]
 pub struct ReturnStatement {
     // return_value: Box<dyn Expression>,
     return_value: Option<Box<dyn Expression>>,
+}
+
+impl Node for ReturnStatement {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 impl Statement for ReturnStatement {
@@ -14,10 +20,6 @@ impl Statement for ReturnStatement {
             buffer.push_str(&value.string_representation());
         }
         buffer
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 
     fn token_literal(&self) -> String {

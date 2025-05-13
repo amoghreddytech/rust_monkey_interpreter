@@ -1,4 +1,4 @@
-use crate::{ast::traits::Expression, token::token::TokenType};
+use crate::{ast::traits::Expression, ast::traits::Node, token::token::TokenType};
 
 #[derive(Debug)]
 pub struct InfixExpression {
@@ -19,6 +19,12 @@ impl InfixExpression {
     }
 }
 
+impl Node for InfixExpression {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
 impl Expression for InfixExpression {
     fn string_representation(&self) -> String {
         let left_str = match &self.left {
@@ -32,9 +38,5 @@ impl Expression for InfixExpression {
         };
 
         format!("({} {} {})", left_str, self.operator, right_str)
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 }

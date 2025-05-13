@@ -1,7 +1,7 @@
 use crate::{
     ast::{
         statements::BlockStatement,
-        traits::{Expression, Statement},
+        traits::{Expression, Node, Statement},
     },
     token::token::TokenType,
 };
@@ -29,11 +29,12 @@ impl FunctionExpression {
     }
 }
 
-impl Expression for FunctionExpression {
+impl Node for FunctionExpression {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
-
+}
+impl Expression for FunctionExpression {
     fn string_representation(&self) -> String {
         let mut buffer = String::new();
         let mut parameters: Vec<String> = vec![];

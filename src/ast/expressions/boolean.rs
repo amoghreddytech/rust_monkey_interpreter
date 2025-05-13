@@ -1,9 +1,15 @@
-use crate::{ast::traits::Expression, token::token::TokenType};
+use crate::{ast::traits::Expression, ast::traits::Node, token::token::TokenType};
 
 #[derive(Debug)]
 pub struct BooleanExpression {
     pub token: TokenType,
     pub value: bool,
+}
+
+impl Node for BooleanExpression {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 impl BooleanExpression {
@@ -33,9 +39,5 @@ impl Expression for BooleanExpression {
         } else {
             return "false".to_string();
         }
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 }

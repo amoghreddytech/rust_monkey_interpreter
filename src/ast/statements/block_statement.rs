@@ -1,4 +1,7 @@
-use crate::{ast::traits::Statement, token::token::TokenType};
+use crate::{
+    ast::traits::{Node, Statement},
+    token::token::TokenType,
+};
 
 #[derive(Debug)]
 pub struct BlockStatement {
@@ -15,6 +18,12 @@ impl BlockStatement {
     }
 }
 
+impl Node for BlockStatement {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
 impl Statement for BlockStatement {
     fn token_literal(&self) -> String {
         "".to_string()
@@ -28,9 +37,5 @@ impl Statement for BlockStatement {
         }
 
         buffer
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 }
