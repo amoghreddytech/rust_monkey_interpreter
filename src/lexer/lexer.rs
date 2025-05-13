@@ -1,12 +1,12 @@
 use crate::token::token::{TokenType, lookup_ident};
 
 #[derive(Debug)]
-pub struct Lexer<'a> {
+pub struct Lexer {
     // this will be the input and let's pass a refrence
     // I'm basica
     //
     // lly saying that Lexer can't outlive the refrence to input
-    input: &'a str,
+    input: String,
     // current reading position in input (point to current char)
     position: usize,
     // current reading position in input (after current char)usize,
@@ -15,12 +15,12 @@ pub struct Lexer<'a> {
     ch: u8,
 }
 
-impl<'a> Lexer<'a> {
-    pub fn new(input: &'a str) -> Self {
+impl Lexer {
+    pub fn new(input: String) -> Self {
         // baiscally there can never be leading whitespaces when the lexer is created so the posistions make sense.
         let input = input.trim_start();
         return Self {
-            input,
+            input: input.to_string(),
             position: 0,
             read_position: 1,
             ch: input.as_bytes().get(0).copied().unwrap_or(0),
@@ -170,7 +170,7 @@ mod tests {
             TokenType::EOF,
         ];
 
-        let mut l = Lexer::new(input);
+        let mut l = Lexer::new(input.to_string());
 
         for (_, token_type) in output.iter().enumerate() {
             let tok = l.next_token();
@@ -201,7 +201,7 @@ if (5 < 10) {
 10 != 9;
 
 ";
-        let mut l = Lexer::new(input);
+        let mut l = Lexer::new(input.to_string());
         assert_eq!(l.next_token(), TokenType::LET);
         assert_eq!(l.next_token(), TokenType::IDENT("five".to_string()));
         assert_eq!(l.next_token(), TokenType::ASSIGN);

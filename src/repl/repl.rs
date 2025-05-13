@@ -1,6 +1,9 @@
-use crate::lexer::lexer::Lexer;
+use crate::ast::ast::Program;
+use crate::parser::parser::Parser;
 use crate::token::token::TokenType;
+use crate::{lexer::lexer::Lexer, parser};
 use std::io::{BufRead, Write};
+use std::os::unix::process;
 
 const PROMT: &str = ">> ";
 
@@ -42,20 +45,16 @@ pub fn start_repl<R: BufRead, W: Write>(input: R, mut output: W) {
 
         history.push(line.to_string());
 
-        let mut lexer = Lexer::new(line);
-        let mut token_count = 0;
+        let mut lexer = Lexer::new(line.to_string());
+        let parser = Parser::new(lexer);
+        let mut p = Program::new(parser);
+        p.parse_program();
 
-        loop {
-            let token: TokenType = lexer.next_token();
-            writeln!(output, "    {:?}", token).unwrap();
-
-            token_count += 1;
-
-            if token == TokenType::EOF {
-                break;
-            }
+        if p.errors_from_parser.len() != 0 {
+            println!("{:?}", p.errors_from_parser);
+            continue;
         }
 
-        writeln!(output, "Process {} tokens", token_count - 1).unwrap();
+        writeln!(output, "{:?}", p.string()).unwrap();
     }
 }

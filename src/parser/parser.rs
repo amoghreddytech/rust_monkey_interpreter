@@ -3,22 +3,22 @@ use crate::ast::expressions::{
     GroupedExpression, IdentifierExpression, InfixExpression, IntegerExpression, PrefixExpression,
 };
 use crate::ast::statements::{BlockStatement, ExpressionStatement, LetStatement, ReturnStatement};
-use crate::ast::traits::{Expression, Statement};
+use crate::ast::traits::{Expression, Node, Statement};
 use crate::lexer::lexer::Lexer;
 use crate::token::token::{PRECEDENCE, TokenType};
 use anyhow::{Result, anyhow};
 use std::mem;
 
 #[allow(dead_code)]
-pub struct Parser<'a> {
-    pub lexer: &'a mut Lexer<'a>,
+pub struct Parser {
+    pub lexer: Lexer,
     pub cur_token: TokenType,
     pub next_token: TokenType,
     pub errors: Vec<anyhow::Error>,
 }
 
-impl std::fmt::Debug for Parser<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl std::fmt::Debug for Parser {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
             "Cur token {}, Next Token, {}",
@@ -29,8 +29,8 @@ impl std::fmt::Debug for Parser<'_> {
 }
 
 #[allow(dead_code)]
-impl<'a> Parser<'a> {
-    pub fn new(lexer: &'a mut Lexer<'a>) -> Self {
+impl Parser {
+    pub fn new(mut lexer: Lexer) -> Self {
         let cur_token: TokenType = lexer.next_token();
         let next_token: TokenType = lexer.next_token();
 
@@ -80,71 +80,54 @@ impl<'a> Parser<'a> {
         self.next_token.get_precedence()
     }
 
-    fn parse_let_statement(&mut self) -> Result<LetStatement> {
-        if self.cur_token != TokenType::LET {
-            return Err(anyhow!(
-                "The token needs to be a let token but its a/an {:?} token",
-                self.cur_token
-            ));
+    fn parse_let_statement(&mut self) -> Option<LetStatement> {
+        let cur_token = self.cur_token.clone();
+        // println!("{:?}", self.next_token);
+
+        if !self.peek_and_move(&TokenType::IDENT("x".to_string())) {
+            return None;
         }
 
-        if !self.peek_and_move(&TokenType::IDENT("".to_string())) {
-            return Err(anyhow!(
-                "The token needs to be an IDENT token but its a/an {:?} token",
-                self.next_token
-            ));
-        }
-
-        let mut name = String::new();
-
-        if let TokenType::IDENT(ident_name) = &self.cur_token {
-            name = ident_name.clone();
-        }
+        let name = IdentifierExpression::new(self.cur_token.clone());
 
         if !self.peek_and_move(&TokenType::ASSIGN) {
-            return Err(anyhow!(
-                "the token needs to an ASSIGN token but its a/an {:?} token",
-                self.next_token
-            ));
-        }
-
-        // We'll skip the expression until we encounter a semicolon
-        // we have to write this bit later
-        while !self.compare_cur_token(&TokenType::SEMICOLON) {
-            self.next_token();
-        }
-
-        let let_statement = LetStatement::new(name, None);
-
-        Ok(let_statement)
-    }
-
-    fn parse_return_statement(&mut self) -> Result<ReturnStatement> {
-        if self.cur_token != TokenType::RETURN {
-            return Err(anyhow!(
-                "
-                    The token need to a return token but it's a/an {:?} token
-                ",
-                self.cur_token
-            ));
+            return None;
         }
 
         self.next_token();
 
-        // TODO : We're skipping expressions until we encounter a semicolon;
+        let value = self.parse_expression(PRECEDENCE::LOWEST);
+
+        if self.next_token == TokenType::SEMICOLON {
+            self.next_token();
+        }
+
+        let let_statement = LetStatement::new(cur_token, name, value);
+
+        Some(let_statement)
+    }
+
+    fn parse_return_statement(&mut self) -> Option<ReturnStatement> {
+        if self.cur_token != TokenType::RETURN {
+            return None;
+        }
+
+        self.next_token();
+
+        let value = self.parse_expression(PRECEDENCE::LOWEST);
 
         while !self.compare_cur_token(&TokenType::SEMICOLON) {
             if self.cur_token == TokenType::ILLEGAL || self.cur_token == TokenType::EOF {
-                return Err(anyhow!("A return statemnt needs to end with a semicolon"));
+                return None;
             }
 
             self.next_token();
         }
 
         // we need to pass the expression value into the return statment
-        let return_statement = ReturnStatement::new(None);
+        let return_statement = ReturnStatement::new(value);
 
-        Ok(return_statement)
+        Some(return_statement)
     }
 
     fn parse_grouped_expression(&mut self) -> Option<GroupedExpression> {
@@ -412,7 +395,7 @@ impl<'a> Parser<'a> {
         Some(left)
     }
 
-    fn parse_expression_statement(&mut self) -> Result<ExpressionStatement> {
+    fn parse_expression_statement(&mut self) -> Option<ExpressionStatement> {
         let mut expression_statement = ExpressionStatement::new(self.cur_token.clone());
 
         expression_statement.expression = self.parse_expression(PRECEDENCE::LOWEST);
@@ -421,29 +404,36 @@ impl<'a> Parser<'a> {
             self.next_token();
         }
 
-        Ok(expression_statement)
+        Some(expression_statement)
     }
 
     pub fn parse_statement(&mut self) -> Option<Box<dyn Statement>> {
         match self.cur_token {
             TokenType::LET => match self.parse_let_statement() {
-                Ok(let_statement) => return Some(Box::new(let_statement)),
-                Err(e) => {
-                    self.errors.push(e);
+                Some(let_statement) => return Some(Box::new(let_statement)),
+                None => {
+                    self.errors.push(anyhow!(
+                        "There is something wrong with the let statement construction"
+                    ));
                     None
                 }
             },
             TokenType::RETURN => match self.parse_return_statement() {
-                Ok(return_statement) => return Some(Box::new(return_statement)),
-                Err(e) => {
-                    self.errors.push(e);
+                Some(return_statement) => return Some(Box::new(return_statement)),
+                None => {
+                    self.errors.push(anyhow!(
+                        "There is something wrong with the return statement construction"
+                    ));
                     None
                 }
             },
             _ => match self.parse_expression_statement() {
-                Ok(expression_statement) => return Some(Box::new(expression_statement)),
-                Err(e) => {
-                    self.errors.push(e);
+                Some(expression_statement) => return Some(Box::new(expression_statement)),
+                None => {
+                    self.errors.push(anyhow!(
+                        "There is something wrong in the construction of the expressionstatement"
+                    ));
+
                     None
                 }
             },
@@ -454,18 +444,99 @@ impl<'a> Parser<'a> {
 #[cfg(test)]
 mod test {
 
-    use crate::ast::{
-        ast::Program,
-        expressions::{boolean::BooleanExpression, infix},
-    };
+    use crate::ast::{ast::Program, expressions::boolean::BooleanExpression};
 
     use super::*;
 
     #[test]
+    fn test_let_statement_one() {
+        let input = "let x = 5";
+
+        let lexer = Lexer::new(input.to_string());
+        let parser = Parser::new(lexer);
+        let mut p = Program::new(parser);
+        p.parse_program();
+
+        assert_eq!(p.statements.len(), 1);
+        let statement = &p.statements[0];
+        let expr_statement = statement
+            .as_any()
+            .downcast_ref::<LetStatement>()
+            .expect("Expected an Let statemnt");
+
+        assert_eq!(expr_statement.name.value, "x");
+
+        if let Some(expression) = &expr_statement.value {
+            let interget_expression = expression
+                .as_any()
+                .downcast_ref::<IntegerExpression>()
+                .expect("Expected an integer expression");
+
+            assert_eq!(interget_expression.value, 5);
+        }
+    }
+
+    #[test]
+    fn test_let_statement_two() {
+        let input = "let y = true";
+
+        let lexer = Lexer::new(input.to_string());
+        let parser = Parser::new(lexer);
+        let mut p = Program::new(parser);
+        p.parse_program();
+
+        assert_eq!(p.statements.len(), 1);
+        let statement = &p.statements[0];
+        let expr_statement = statement
+            .as_any()
+            .downcast_ref::<LetStatement>()
+            .expect("Expected an Let statemnt");
+
+        assert_eq!(expr_statement.name.value, "y");
+
+        if let Some(expression) = &expr_statement.value {
+            let interget_expression = expression
+                .as_any()
+                .downcast_ref::<BooleanExpression>()
+                .expect("Expected a boolean expression");
+
+            assert_eq!(interget_expression.value, true);
+        }
+    }
+
+    #[test]
+    fn test_let_statement_three() {
+        let input = "let x = foobar";
+
+        let lexer = Lexer::new(input.to_string());
+        let parser = Parser::new(lexer);
+        let mut p = Program::new(parser);
+        p.parse_program();
+
+        assert_eq!(p.statements.len(), 1);
+        let statement = &p.statements[0];
+        let expr_statement = statement
+            .as_any()
+            .downcast_ref::<LetStatement>()
+            .expect("Expected an Let statemnt");
+
+        assert_eq!(expr_statement.name.value, "x");
+
+        if let Some(expression) = &expr_statement.value {
+            let interget_expression = expression
+                .as_any()
+                .downcast_ref::<IdentifierExpression>()
+                .expect("Expected an identifier expression");
+
+            assert_eq!(interget_expression.value, "foobar");
+        }
+    }
+
+    #[test]
     fn test_identifier_expression() {
         let input = "foobar;";
-        let mut lexer = Lexer::new(input);
-        let parser = Parser::new(&mut lexer);
+        let lexer = Lexer::new(input.to_string());
+        let parser = Parser::new(lexer);
         let mut p = Program::new(parser);
         p.parse_program();
         assert_eq!(p.statements.len(), 1);
@@ -491,8 +562,8 @@ mod test {
     #[test]
     fn test_integer_expression() {
         let input = "5;";
-        let mut lexer = Lexer::new(input);
-        let parser = Parser::new(&mut lexer);
+        let lexer = Lexer::new(input.to_string());
+        let parser = Parser::new(lexer);
         let mut p = Program::new(parser);
         p.parse_program();
         assert_eq!(p.statements.len(), 1);
@@ -588,8 +659,8 @@ mod test {
         let outputs: Vec<(&str, usize)> = vec![("!", 5), ("-", 15)];
 
         for (index, inpu) in input.iter().enumerate() {
-            let mut lexer = Lexer::new(inpu);
-            let parser = Parser::new(&mut lexer);
+            let lexer = Lexer::new(inpu.to_string());
+            let parser = Parser::new(lexer);
             let mut p = Program::new(parser);
             p.parse_program();
             assert_eq!(p.statements.len(), 1);
@@ -622,8 +693,8 @@ mod test {
     #[test]
     fn test_if_expression() {
         let input = "if (x < y) { x }";
-        let mut lexer = Lexer::new(input);
-        let parser = Parser::new(&mut lexer);
+        let lexer = Lexer::new(input.to_string());
+        let parser = Parser::new(lexer);
         let mut p = Program::new(parser);
         p.parse_program();
         assert_eq!(p.statements.len(), 1);
@@ -637,7 +708,7 @@ mod test {
             .expression
             .as_ref()
             .expect("Expression should exists");
-
+        // testLiteralExpression
         let conditional_expression = expression
             .as_any()
             .downcast_ref::<ConditionalExpression>()
@@ -686,8 +757,8 @@ mod test {
     #[test]
     fn test_if_else_condition() {
         let input = "if (x < y) { x } else { y }";
-        let mut lexer = Lexer::new(input);
-        let parser = Parser::new(&mut lexer);
+        let lexer = Lexer::new(input.to_string());
+        let parser = Parser::new(lexer);
         let mut p = Program::new(parser);
         p.parse_program();
         assert_eq!(p.statements.len(), 1);
@@ -839,8 +910,8 @@ mod test {
 
         for input in inputs {
             let (input, left, op, right) = input;
-            let mut lexer = Lexer::new(input);
-            let parser = Parser::new(&mut lexer);
+            let lexer = Lexer::new(input.to_string());
+            let parser = Parser::new(lexer);
             let mut p = Program::new(parser);
             p.parse_program();
             assert_eq!(p.statements.len(), 1);
@@ -880,8 +951,8 @@ mod test {
         }
 
         pub fn run_test(&self) -> bool {
-            let mut lexer = Lexer::new(&self.input);
-            let parser = Parser::new(&mut lexer);
+            let lexer = Lexer::new(self.input.to_string());
+            let parser = Parser::new(lexer);
             let mut p = Program::new(parser);
             p.parse_program();
 
@@ -929,6 +1000,15 @@ mod test {
             TestOperatorPrecedence::new("2 / (5 + 5)", "(2 / (5 + 5))"),
             TestOperatorPrecedence::new("-(5 + 5)", "(-(5 + 5))"),
             TestOperatorPrecedence::new("!(true == true)", "(!(true == true))"),
+            TestOperatorPrecedence::new("a + add(b * c) + d", "((a + add((b * c))) + d)"),
+            TestOperatorPrecedence::new(
+                "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+                "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
+            ),
+            TestOperatorPrecedence::new(
+                "add(a + b + c * d / f + g)",
+                "add((((a + b) + ((c * d) / f)) + g))",
+            ),
         ];
         for test in tests.iter() {
             assert!(test.run_test());
@@ -938,8 +1018,8 @@ mod test {
     #[test]
     fn test_boolean_expression() {
         let input = "true;";
-        let mut lexer = Lexer::new(input);
-        let parser = Parser::new(&mut lexer);
+        let mut lexer = Lexer::new(input.to_string());
+        let parser = Parser::new(lexer);
         let mut p = Program::new(parser);
         p.parse_program();
         assert_eq!(p.statements.len(), 1);
@@ -969,8 +1049,8 @@ mod test {
         let outputs = vec![vec![], vec!["x"], vec!["x", "y", "z"]];
 
         for (input, output) in inputs.iter().zip(outputs) {
-            let mut lexer = Lexer::new(input);
-            let parser = Parser::new(&mut lexer);
+            let lexer = Lexer::new(input.to_string());
+            let parser = Parser::new(lexer);
             let mut p = Program::new(parser);
             p.parse_program();
             let statement = &p.statements[0];
@@ -1006,8 +1086,8 @@ mod test {
     #[test]
     fn test_function_literal() {
         let input = "fn(x,y) { x + y; }";
-        let mut lexer = Lexer::new(input);
-        let parser = Parser::new(&mut lexer);
+        let lexer = Lexer::new(input.to_string());
+        let parser = Parser::new(lexer);
         let mut p = Program::new(parser);
         p.parse_program();
         assert_eq!(p.statements.len(), 1);
@@ -1063,8 +1143,8 @@ mod test {
     #[test]
     fn test_call_expression() {
         let input = "add(1, 2 * 3, 4 + 5);";
-        let mut lexer = Lexer::new(input);
-        let parser = Parser::new(&mut lexer);
+        let mut lexer = Lexer::new(input.to_string());
+        let parser = Parser::new(lexer);
         let mut p = Program::new(parser);
         p.parse_program();
         assert_eq!(p.statements.len(), 1);
