@@ -40,4 +40,8 @@ impl Expression for CallExpression {
 
         buffer
     }
+
+    fn as_node(&self) -> &dyn Node {
+        self
+    }
 }

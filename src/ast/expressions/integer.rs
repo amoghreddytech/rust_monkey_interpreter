@@ -2,7 +2,7 @@ use crate::{ast::traits::Expression, ast::traits::Node, token::token::TokenType}
 
 #[derive(Debug)]
 pub struct IntegerExpression {
-    pub value: usize,
+    pub value: i64,
 }
 
 impl IntegerExpression {
@@ -25,5 +25,8 @@ impl Node for IntegerExpression {
 impl Expression for IntegerExpression {
     fn string_representation(&self) -> String {
         self.value.to_string()
+    }
+    fn as_node(&self) -> &dyn Node {
+        self
     }
 }

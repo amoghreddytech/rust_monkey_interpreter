@@ -39,4 +39,8 @@ impl Expression for InfixExpression {
 
         format!("({} {} {})", left_str, self.operator, right_str)
     }
+
+    fn as_node(&self) -> &dyn Node {
+        self
+    }
 }

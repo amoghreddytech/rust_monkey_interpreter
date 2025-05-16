@@ -51,4 +51,8 @@ impl Expression for FunctionExpression {
 
         buffer
     }
+
+    fn as_node(&self) -> &dyn Node {
+        self
+    }
 }

@@ -47,4 +47,7 @@ impl Expression for ConditionalExpression {
 
         buffer
     }
+    fn as_node(&self) -> &dyn Node {
+        self
+    }
 }

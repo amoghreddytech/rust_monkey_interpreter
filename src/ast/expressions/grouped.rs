@@ -24,4 +24,8 @@ impl Expression for GroupedExpression {
             None => "There is no Expression".to_string(),
         }
     }
+
+    fn as_node(&self) -> &dyn Node {
+        self
+    }
 }

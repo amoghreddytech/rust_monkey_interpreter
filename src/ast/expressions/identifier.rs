@@ -27,4 +27,8 @@ impl Expression for IdentifierExpression {
     fn string_representation(&self) -> String {
         self.value.clone()
     }
+
+    fn as_node(&self) -> &dyn Node {
+        self
+    }
 }

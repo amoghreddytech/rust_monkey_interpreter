@@ -40,4 +40,8 @@ impl Expression for BooleanExpression {
             return "false".to_string();
         }
     }
+
+    fn as_node(&self) -> &dyn Node {
+        self
+    }
 }
