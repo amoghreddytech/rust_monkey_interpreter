@@ -50,6 +50,39 @@ fn eval_prefix_expression(operator: String, right: Box<dyn Object>) -> Option<Bo
     }
 }
 
+fn eval_integer_infix(operator: String, left: i64, right: i64) -> Box<dyn Object> {
+    if operator == "+" {
+        return Box::new(Integer::new(left + right));
+    } else if operator == "-" {
+        return Box::new(Integer::new(left - right));
+    } else if operator == "/" {
+        return Box::new(Integer::new(left / right));
+    } else if operator == "*" {
+        return Box::new(Integer::new(left * right));
+    } else {
+        Box::new(Null {})
+    }
+}
+
+fn eval_infix_expression(
+    operator: String,
+    left: Box<dyn Object>,
+    right: Box<dyn Object>,
+) -> Option<Box<dyn Object>> {
+    if let (Some(left_int), Some(right_int)) = (
+        left.as_any().downcast_ref::<Integer>(),
+        right.as_any().downcast_ref::<Integer>(),
+    ) {
+        return Some(eval_integer_infix(
+            operator,
+            left_int.value,
+            right_int.value,
+        ));
+    } else {
+        return None;
+    }
+}
+
 pub fn evaluate(node: &dyn Node) -> Option<Box<dyn Object>> {
     if let Some(program_node) = node.as_any().downcast_ref::<Program>() {
         return Some(eval_statements(&program_node.statements));
@@ -64,6 +97,24 @@ pub fn evaluate(node: &dyn Node) -> Option<Box<dyn Object>> {
             }
             None => return None,
         }
+    }
+
+    if let Some(grouped_node) = node.as_any().downcast_ref::<GroupedExpression>() {
+        return match &grouped_node.value {
+            Some(grouped_expression) => evaluate(grouped_expression.as_ref().as_node()),
+            _ => None,
+        };
+    }
+
+    if let Some(infix_node) = node.as_any().downcast_ref::<InfixExpression>() {
+        return match (&infix_node.left, &infix_node.right) {
+            (Some(left_expr), Some(right_expr)) => {
+                let left = evaluate(left_expr.as_ref().as_node())?;
+                let right = evaluate(right_expr.as_ref().as_node())?;
+                return eval_infix_expression(infix_node.operator.clone(), left, right);
+            }
+            _ => None,
+        };
     }
 
     if let Some(boolean_node) = node.as_any().downcast_ref::<BooleanExpression>() {
@@ -157,12 +208,11 @@ mod test {
         let mut p = Program::new(parser);
         p.parse_program();
 
-        println!("{:?}", p.statements);
-
         return evaluate(&p);
     }
 
     fn test_integer_object(object: Box<dyn Object>, expected: i64) {
+        println!("{:?}", object);
         let int_object = object
             .as_any()
             .downcast_ref::<Integer>()
@@ -180,11 +230,22 @@ mod test {
 
     #[test]
     fn test_eval_integer_expression() {
-        let tests: Vec<(String, i64)> = vec![
+        let tests = vec![
             ("5".to_string(), 5),
             ("10".to_string(), 10),
             ("-5".to_string(), -5),
             ("-10".to_string(), -10),
+            ("5 + 5 + 5 + 5 - 10".to_string(), 10),
+            ("2 * 2 * 2 * 2 * 2".to_string(), 32),
+            ("-50 + 100 + -50".to_string(), 0),
+            ("5 * 2 + 10".to_string(), 20),
+            ("5 + 2 * 10".to_string(), 25),
+            ("20 + 2 * -10".to_string(), 0),
+            ("50 / 2 * 2 + 10".to_string(), 60),
+            ("2 * (5 + 10)".to_string(), 30),
+            ("3 * 3 * 3 + 10".to_string(), 37),
+            ("3 * (3 * 3) + 10".to_string(), 37),
+            ("(5 + 10 * 2 + 15 / 3) * 2 + -10".to_string(), 50),
         ];
 
         for t in tests {
