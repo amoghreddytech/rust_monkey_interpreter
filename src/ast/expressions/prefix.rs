@@ -48,4 +48,8 @@ impl Expression for PrefixExpression {
             "(".to_string() + "None" + &self.operator.clone() + ")"
         }
     }
+
+    fn as_node(&self) -> &dyn Node {
+        self
+    }
 }
