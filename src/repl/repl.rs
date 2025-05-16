@@ -1,4 +1,5 @@
 use crate::ast::ast::Program;
+use crate::evaluator::evaluator::evaluate;
 use crate::parser::parser::Parser;
 use crate::token::token::TokenType;
 use crate::{lexer::lexer::Lexer, parser};
@@ -55,6 +56,14 @@ pub fn start_repl<R: BufRead, W: Write>(input: R, mut output: W) {
             continue;
         }
 
-        writeln!(output, "{:?}", p.string()).unwrap();
+        let evaluated = evaluate(&p);
+
+        match evaluated {
+            Some(eval) => {
+                let output_string = eval.inspect();
+                writeln!(output, "{:?}", output_string).unwrap()
+            }
+            None => writeln!(output, "").unwrap(),
+        }
     }
 }

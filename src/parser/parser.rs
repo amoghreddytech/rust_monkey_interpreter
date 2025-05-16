@@ -34,13 +34,13 @@ impl Parser {
         let cur_token: TokenType = lexer.next_token();
         let next_token: TokenType = lexer.next_token();
 
-        if cur_token == TokenType::EOF
-            || cur_token == TokenType::ILLEGAL
-            || next_token == TokenType::EOF
-            || next_token == TokenType::ILLEGAL
-        {
-            panic!("The lexer in the parser constructor does not have two tokens.")
-        }
+        // if cur_token == TokenType::EOF
+        // || cur_token == TokenType::ILLEGAL
+        // || next_token == TokenType::EOF
+        // || next_token == TokenType::ILLEGAL
+        // {
+        // panic!("The lexer in the parser constructor does not have two tokens.")
+        // }
 
         Self {
             lexer,
@@ -367,10 +367,10 @@ impl Parser {
     fn parse_expression(&mut self, precedence: PRECEDENCE) -> Option<Box<dyn Expression>> {
         let mut left = self.parse_prefix()?;
 
-        let precedence_as_usize = precedence as usize;
+        let precedence_as_usize = precedence as i64;
 
         while !self.compare_next_token(&TokenType::SEMICOLON)
-            && precedence_as_usize < self.get_peek_precedence() as usize
+            && precedence_as_usize < self.get_peek_precedence() as i64
         {
             left = match self.next_token {
                 TokenType::PLUS
@@ -587,7 +587,7 @@ mod test {
         assert_eq!(integer_expression.string_representation(), "5");
     }
 
-    fn test_interget_literal(expr: &dyn Expression, value: usize) -> bool {
+    fn test_interget_literal(expr: &dyn Expression, value: i64) -> bool {
         expr.as_any()
             .downcast_ref::<IntegerExpression>()
             .map_or(false, |int_expr| int_expr.value == value)
@@ -609,12 +609,12 @@ mod test {
         fn test(&self, expr: &dyn Expression) -> bool;
     }
 
-    impl TestLiteral for usize {
+    impl TestLiteral for i64 {
         fn test(&self, expr: &dyn Expression) -> bool {
             test_interget_literal(expr, *self)
         }
     }
-    impl TestLiteral for &usize {
+    impl TestLiteral for &i64 {
         fn test(&self, expr: &dyn Expression) -> bool {
             test_interget_literal(expr, **self)
         }
@@ -622,7 +622,7 @@ mod test {
 
     impl TestLiteral for i32 {
         fn test(&self, expr: &dyn Expression) -> bool {
-            test_interget_literal(expr, *self as usize)
+            test_interget_literal(expr, *self as i64)
         }
     }
 
@@ -656,7 +656,7 @@ mod test {
     #[test]
     fn test_prefix_bang_operand() {
         let input: Vec<String> = vec!["!5;".to_string(), "-15;".to_string()];
-        let outputs: Vec<(&str, usize)> = vec![("!", 5), ("-", 15)];
+        let outputs: Vec<(&str, i64)> = vec![("!", 5), ("-", 15)];
 
         for (index, inpu) in input.iter().enumerate() {
             let lexer = Lexer::new(inpu.to_string());
