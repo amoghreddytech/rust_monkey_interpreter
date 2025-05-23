@@ -2,7 +2,7 @@ use crate::object::traits::{Object, ObjectType};
 
 const INTEGER_OBJ: &'static str = "INTEGER";
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Integer {
     pub value: i64,
 }

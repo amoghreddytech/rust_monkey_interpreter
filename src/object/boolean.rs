@@ -2,7 +2,7 @@ use crate::object::traits::{Object, ObjectType};
 
 const BOOLEAN_OBJ: &'static str = "BOOLEAN";
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Boolean {
     pub value: bool,
 }
