@@ -3,7 +3,7 @@ use crate::ast::traits::{Expression, Node, Statement};
 #[derive(Debug)]
 pub struct ReturnStatement {
     // return_value: Box<dyn Expression>,
-    return_value: Option<Box<dyn Expression>>,
+    pub return_value: Option<Box<dyn Expression>>,
 }
 
 impl Node for ReturnStatement {
@@ -13,6 +13,10 @@ impl Node for ReturnStatement {
 }
 
 impl Statement for ReturnStatement {
+    fn as_node(&self) -> &dyn Node {
+        self
+    }
+
     fn string_representation(&self) -> String {
         let mut buffer = String::new();
         buffer.push_str(&self.token_literal());

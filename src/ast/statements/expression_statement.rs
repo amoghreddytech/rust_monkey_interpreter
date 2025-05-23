@@ -14,6 +14,9 @@ impl Node for ExpressionStatement {
 }
 
 impl Statement for ExpressionStatement {
+    fn as_node(&self) -> &dyn Node {
+        self
+    }
     fn string_representation(&self) -> String {
         let mut buffer = String::new();
         if let Some(exp) = &self.expression {

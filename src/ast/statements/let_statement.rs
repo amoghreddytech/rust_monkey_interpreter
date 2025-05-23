@@ -19,6 +19,10 @@ impl Node for LetStatement {
     }
 }
 impl Statement for LetStatement {
+    fn as_node(&self) -> &dyn Node {
+        self
+    }
+
     fn string_representation(&self) -> String {
         let mut buffer = String::new();
 

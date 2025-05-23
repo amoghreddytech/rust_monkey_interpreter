@@ -25,6 +25,10 @@ impl Node for BlockStatement {
 }
 
 impl Statement for BlockStatement {
+    fn as_node(&self) -> &dyn Node {
+        self
+    }
+
     fn token_literal(&self) -> String {
         "".to_string()
     }
