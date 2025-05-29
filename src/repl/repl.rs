@@ -1,10 +1,8 @@
 use crate::ast::ast::Program;
 use crate::evaluator::evaluator::evaluate;
+use crate::lexer::lexer::Lexer;
 use crate::parser::parser::Parser;
-use crate::token::token::TokenType;
-use crate::{lexer::lexer::Lexer, parser};
 use std::io::{BufRead, Write};
-use std::os::unix::process;
 
 const PROMT: &str = ">> ";
 
@@ -59,11 +57,11 @@ pub fn start_repl<R: BufRead, W: Write>(input: R, mut output: W) {
         let evaluated = evaluate(&p);
 
         match evaluated {
-            Some(eval) => {
+            Ok(eval) => {
                 let output_string = eval.inspect();
                 writeln!(output, "{:?}", output_string).unwrap()
             }
-            None => writeln!(output, "").unwrap(),
+            Err(e) => writeln!(output, "{}", e).unwrap(),
         }
     }
 }
