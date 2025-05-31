@@ -2,16 +2,9 @@ use crate::token::token::{TokenType, lookup_ident};
 
 #[derive(Debug)]
 pub struct Lexer {
-    // this will be the input and let's pass a refrence
-    // I'm basica
-    //
-    // lly saying that Lexer can't outlive the refrence to input
     input: String,
-    // current reading position in input (point to current char)
     position: usize,
-    // current reading position in input (after current char)usize,
     read_position: usize,
-    // current nder examination
     ch: u8,
 }
 

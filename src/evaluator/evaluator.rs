@@ -2,9 +2,8 @@ use crate::{
     ast::{
         ast::Program,
         expressions::{
-            BooleanExpression, CallExpression, ConditionalExpression, FunctionExpression,
-            GroupedExpression, IdentifierExpression, InfixExpression, IntegerExpression,
-            PrefixExpression,
+            BooleanExpression, ConditionalExpression, GroupedExpression, InfixExpression,
+            IntegerExpression, PrefixExpression,
         },
         statements::{BlockStatement, ExpressionStatement, ReturnStatement},
         traits::{Node, Statement},
@@ -422,6 +421,18 @@ mod test {
     }
 
     #[test]
+    fn test_let_statement() {
+        let tests = vec![
+            ("let a = 5; a;", 5),
+            ("let a = 5 * 5; a;", 25),
+            ("let a = 5; let b = a; b;", 5),
+            ("let a = 5; let b = a; let c = a + b + 5; c;", 15),
+        ];
+
+        for (input, expected_output) in tests {}
+    }
+
+    #[test]
     fn test_error_handling() {
         let tests = vec![
             ("5 + true;", "type mismatch: INTEGER + BOOLEAN"),
@@ -444,6 +455,7 @@ mod test {
             ",
                 "unknown operator: BOOLEAN + BOOLEAN",
             ),
+            ("foobar;", "identifier not found: foobar"),
         ];
 
         for (input, expected_message) in tests {

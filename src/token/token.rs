@@ -54,29 +54,8 @@ pub enum TokenType {
     RETURN,
 }
 
-lazy_static! {
-    pub static ref keywords: HashMap<&'static str, TokenType> = {
-        let mut map = HashMap::new();
-        map.insert("fn", TokenType::FUNCTION);
-        map.insert("let", TokenType::LET);
-        map.insert("true", TokenType::TRUE);
-        map.insert("false", TokenType::FALSE);
-        map.insert("if", TokenType::IF);
-        map.insert("else", TokenType::ELSE);
-        map.insert("return", TokenType::RETURN);
-        map
-    };
-}
-
-pub fn lookup_ident(ident: &str) -> TokenType {
-    match keywords.get(ident) {
-        Some(token_type) => token_type.clone(),
-        None => TokenType::IDENT(ident.to_string()),
-    }
-}
-
 impl TokenType {
-    pub fn string_representation(&self) -> String {
+    pub fn token_literal(&self) -> String {
         match &self {
             TokenType::ILLEGAL => "illegal".to_string(),
             TokenType::EOF => "eof".to_string(),
@@ -117,5 +96,26 @@ impl TokenType {
             TokenType::LPAREN => PRECEDENCE::CALL,
             _ => PRECEDENCE::LOWEST,
         }
+    }
+}
+
+lazy_static! {
+    pub static ref keywords: HashMap<&'static str, TokenType> = {
+        let mut map = HashMap::new();
+        map.insert("fn", TokenType::FUNCTION);
+        map.insert("let", TokenType::LET);
+        map.insert("true", TokenType::TRUE);
+        map.insert("false", TokenType::FALSE);
+        map.insert("if", TokenType::IF);
+        map.insert("else", TokenType::ELSE);
+        map.insert("return", TokenType::RETURN);
+        map
+    };
+}
+
+pub fn lookup_ident(ident: &str) -> TokenType {
+    match keywords.get(ident) {
+        Some(token_type) => token_type.clone(),
+        None => TokenType::IDENT(ident.to_string()),
     }
 }
