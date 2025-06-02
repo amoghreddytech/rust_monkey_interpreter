@@ -1,6 +1,7 @@
 use super::{
-    AbstractSyntaxTree, Expression, ExpressionStatement, Identifier, InfixLiteral, IntegerLiteral,
-    LetStatement, PrefixLiteral, ReturnStatement, Statement,
+    AbstractSyntaxTree, BlockStatement, BooleanLiteral, Expression, ExpressionStatement,
+    Identifier, IfLiteral, InfixLiteral, IntegerLiteral, LetStatement, PrefixLiteral,
+    ReturnStatement, Statement,
 };
 use crate::{Lexer, PRECEDENCE, TokenType};
 use anyhow::{Error, Result, anyhow};
@@ -73,10 +74,6 @@ impl Parser {
             self.next_token();
         }
 
-        // if !self.errors.is_empty() {
-        //     return Err(std::mem::take(&mut self.errors));
-        // }
-
         Ok(tree)
     }
 
@@ -140,7 +137,10 @@ impl Parser {
         let mut left_exp = match &self.cur_token {
             TokenType::IDENT(_) => self.parse_identifier()?,
             TokenType::INT(_) => self.parse_integer_literal()?,
+            TokenType::TRUE | TokenType::FALSE => self.parse_boolean()?,
             TokenType::BANG | TokenType::MINUS => self.parse_prefix_expression()?,
+            TokenType::LPAREN => self.parse_grouped_expressions()?,
+            TokenType::IF => self.parse_if_expression()?,
 
             _ => return Err(anyhow!("no prefix parse function for {:?}", self.cur_token)),
         };
@@ -159,17 +159,20 @@ impl Parser {
         Ok(left_exp)
     }
 
-    fn parse_infix_expression(&mut self, left: Box<Expression>) -> Result<Expression, Error> {
-        let token = self.cur_token.clone();
-        let operator = token.token_literal();
-
+    fn parse_grouped_expressions(&mut self) -> Result<Expression, Error> {
         self.next_token();
 
-        let right = Box::new(self.parse_expression(token.get_precedence())?);
+        let expression = self.parse_expression(PRECEDENCE::LOWEST)?;
 
-        let infix_literal = InfixLiteral::new(token, left, operator, right);
+        self.is_peek_and_move(TokenType::RPAREN)?;
 
-        Ok(Expression::InfixExpression(infix_literal))
+        return Ok(expression);
+    }
+
+    fn parse_boolean(&self) -> Result<Expression, Error> {
+        let token = self.cur_token.clone();
+        let boolean_literal = BooleanLiteral::new(token)?;
+        Ok(Expression::BooleanExpression(boolean_literal))
     }
 
     fn parse_identifier(&self) -> Result<Expression, Error> {
@@ -186,6 +189,53 @@ impl Parser {
         Ok(Expression::IntegerExpression(i_literal))
     }
 
+    fn parse_if_expression(&mut self) -> Result<Expression, Error> {
+        let token = self.cur_token.clone();
+
+        self.is_peek_and_move(TokenType::LPAREN)?;
+
+        self.next_token();
+
+        let condition = self.parse_expression(PRECEDENCE::LOWEST)?;
+        self.is_peek_and_move(TokenType::RPAREN)?;
+
+        self.is_peek_and_move(TokenType::LBRACE)?;
+
+        let consequence = self.parse_block_statement()?;
+
+        let alternative = if self.peek_token_is(TokenType::ELSE) {
+            self.next_token();
+            self.is_peek_and_move(TokenType::LBRACE)?;
+            Some(Box::new(self.parse_block_statement()?))
+        } else {
+            None
+        };
+
+        Ok(Expression::IfExpression(IfLiteral::new(
+            token,
+            Box::new(condition),
+            Box::new(consequence),
+            alternative,
+        )))
+    }
+
+    fn parse_block_statement(&mut self) -> Result<Statement, Error> {
+        let token = self.cur_token.clone();
+        let mut statements: Vec<Statement> = Vec::new();
+
+        self.next_token();
+
+        while !self.cur_token_is(TokenType::RBRACE) && !self.cur_token_is(TokenType::EOF) {
+            let stmt = self.parse_statement()?;
+            statements.push(stmt);
+            self.next_token();
+        }
+
+        let block_statement_struct = BlockStatement::new(token, Box::new(statements));
+
+        Ok(Statement::BlockStatement(block_statement_struct))
+    }
+
     fn parse_prefix_expression(&mut self) -> Result<Expression, Error> {
         let token = self.cur_token.clone();
         let operator = token.token_literal();
@@ -197,6 +247,20 @@ impl Parser {
         let prefix_data = PrefixLiteral::new(token, operator, expression)?;
 
         Ok(Expression::PrefixExpression(prefix_data))
+    }
+
+    fn parse_infix_expression(&mut self, left: Box<Expression>) -> Result<Expression, Error> {
+        let token = self.cur_token.clone();
+        let operator = token.token_literal();
+        let precedence = token.get_precedence();
+
+        self.next_token();
+
+        let right = Box::new(self.parse_expression(precedence)?);
+
+        let infix_literal = InfixLiteral::new(token, left, operator, right);
+
+        Ok(Expression::InfixExpression(infix_literal))
     }
 }
 
@@ -238,13 +302,207 @@ mod tests {
         }
     }
 
-    struct TestCase {
-        input: String,
-        expected: String,
+    #[test]
+    fn test_if_expression() {
+        let input = "if (x < y) { x }";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().expect("Failed to parse program");
+
+        // Check parser errors
+        assert!(
+            parser.errors.is_empty(),
+            "Parser had errors: {:?}",
+            parser.errors
+        );
+
+        // Verify statement count
+        assert_eq!(
+            program.statements.len(),
+            1,
+            "program.statements does not contain 1 statement. got={}",
+            program.statements.len()
+        );
+
+        // Verify it's an expression statement
+        let stmt = match &program.statements[0] {
+            Statement::ExpressionStatement(s) => s,
+            _ => panic!(
+                "program.statements[0] is not ExpressionStatement. got={:?}",
+                program.statements[0]
+            ),
+        };
+
+        // Verify it's an if expression
+        let if_expr = match &*stmt.expression {
+            Expression::IfExpression(e) => e,
+            _ => panic!(
+                "stmt.expression is not IfExpression. got={:?}",
+                stmt.expression
+            ),
+        };
+
+        // Verify condition is x < y
+        match &*if_expr.condition {
+            Expression::InfixExpression(infix) => {
+                assert_eq!(infix.operator, "<");
+                // Verify left is 'x'
+                match &*infix.left {
+                    Expression::IdentiferExpression(ident) => assert_eq!(ident.value, "x"),
+                    _ => panic!("Left of condition is not identifier 'x'"),
+                }
+                // Verify right is 'y'
+                match &*infix.right {
+                    Expression::IdentiferExpression(ident) => assert_eq!(ident.value, "y"),
+                    _ => panic!("Right of condition is not identifier 'y'"),
+                }
+            }
+            _ => panic!("Condition is not InfixExpression"),
+        }
+
+        // // Verify consequence has 1 statement
+        match &*if_expr.consequence {
+            Statement::BlockStatement(block) => {
+                assert_eq!(
+                    block.statements.len(),
+                    1,
+                    "consequence does not contain 1 statement. got={}",
+                    block.statements.len()
+                );
+
+                // Verify consequence statement is 'x'
+                match &block.statements[0] {
+                    Statement::ExpressionStatement(expr_stmt) => match &*expr_stmt.expression {
+                        Expression::IdentiferExpression(ident) => assert_eq!(ident.value, "x"),
+                        _ => panic!("Consequence expression is not identifier 'x'"),
+                    },
+                    _ => panic!("Consequence statement is not ExpressionStatement"),
+                }
+            }
+            _ => panic!("Consequence is not BlockStatement"),
+        }
+
+        // Verify no alternative
+        assert!(
+            if_expr.alternative.is_none(),
+            "if_expr.alternative was not None. got={:?}",
+            if_expr.alternative
+        );
+    }
+
+    #[test]
+    fn test_if_else_expression() {
+        let input = "if (x < y) { x } else { y }";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().expect("Failed to parse program");
+
+        // Check parser errors
+        assert!(
+            parser.errors.is_empty(),
+            "Parser had errors: {:?}",
+            parser.errors
+        );
+
+        // Verify statement count
+        assert_eq!(
+            program.statements.len(),
+            1,
+            "program.statements does not contain 1 statement. got={}",
+            program.statements.len()
+        );
+
+        // Verify it's an expression statement
+        let stmt = match &program.statements[0] {
+            Statement::ExpressionStatement(s) => s,
+            _ => panic!(
+                "program.statements[0] is not ExpressionStatement. got={:?}",
+                program.statements[0]
+            ),
+        };
+
+        // Verify it's an if expression
+        let if_expr = match &*stmt.expression {
+            Expression::IfExpression(e) => e,
+            _ => panic!(
+                "stmt.expression is not IfExpression. got={:?}",
+                stmt.expression
+            ),
+        };
+
+        // Verify condition is x < y
+        match &*if_expr.condition {
+            Expression::InfixExpression(infix) => {
+                assert_eq!(infix.operator, "<");
+                // Verify left is 'x'
+                match &*infix.left {
+                    Expression::IdentiferExpression(ident) => assert_eq!(ident.value, "x"),
+                    _ => panic!("Left of condition is not identifier 'x'"),
+                }
+                // Verify right is 'y'
+                match &*infix.right {
+                    Expression::IdentiferExpression(ident) => assert_eq!(ident.value, "y"),
+                    _ => panic!("Right of condition is not identifier 'y'"),
+                }
+            }
+            _ => panic!("Condition is not InfixExpression"),
+        }
+
+        // // Verify consequence has 1 statement
+        match &*if_expr.consequence {
+            Statement::BlockStatement(block) => {
+                assert_eq!(
+                    block.statements.len(),
+                    1,
+                    "consequence does not contain 1 statement. got={}",
+                    block.statements.len()
+                );
+
+                // Verify consequence statement is 'x'
+                match &block.statements[0] {
+                    Statement::ExpressionStatement(expr_stmt) => match &*expr_stmt.expression {
+                        Expression::IdentiferExpression(ident) => assert_eq!(ident.value, "x"),
+                        _ => panic!("Consequence expression is not identifier 'x'"),
+                    },
+                    _ => panic!("Consequence statement is not ExpressionStatement"),
+                }
+            }
+            _ => panic!("Consequence is not BlockStatement"),
+        }
+
+        match if_expr.alternative.as_ref() {
+            Some(alt_stmt) => match &**alt_stmt {
+                Statement::BlockStatement(block) => {
+                    assert_eq!(
+                        block.statements.len(),
+                        1,
+                        "Alternative does not contain 1 statement, got = {}",
+                        block.statements.len()
+                    );
+
+                    match &block.statements[0] {
+                        Statement::ExpressionStatement(expr_stmt) => match &*expr_stmt.expression {
+                            Expression::IdentiferExpression(ident) => {
+                                assert_eq!(ident.value, "y");
+                            }
+                            _ => panic!("Alternative statement is not an identifier 'y'"),
+                        },
+                        _ => panic!("Alternative statement is not an ExpressionStatement"),
+                    }
+                }
+                _ => panic!("Alternative is not BlockStatement"),
+            },
+            None => panic!("if_expr.alternative was None"),
+        }
     }
 
     #[test]
     fn test_operator_precedence_parsing() {
+        struct TestCase {
+            input: String,
+            expected: String,
+        }
+
         let tests = vec![
             TestCase {
                 input: "-a * b".to_string(),
@@ -291,8 +549,40 @@ mod tests {
                 expected: "((5 < 4) != (3 > 4))".to_string(),
             },
             TestCase {
-                input: "3 + 4 * 5 == 3 * 1 + 4 * 5".to_string(),
-                expected: "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))".to_string(),
+                input: "true".to_string(),
+                expected: "true".to_string(),
+            },
+            TestCase {
+                input: "false".to_string(),
+                expected: "false".to_string(),
+            },
+            TestCase {
+                input: "3 > 5 == false".to_string(),
+                expected: "((3 > 5) == false)".to_string(),
+            },
+            TestCase {
+                input: "3 < 5 == true".to_string(),
+                expected: "((3 < 5) == true)".to_string(),
+            },
+            TestCase {
+                input: "1 + (2 + 3) + 4".to_string(),
+                expected: "((1 + (2 + 3)) + 4)".to_string(),
+            },
+            TestCase {
+                input: "(5 + 5) * 2".to_string(),
+                expected: "((5 + 5) * 2)".to_string(),
+            },
+            TestCase {
+                input: "2 / (5 + 5)".to_string(),
+                expected: "(2 / (5 + 5))".to_string(),
+            },
+            TestCase {
+                input: "-(5 + 5)".to_string(),
+                expected: "(-(5 + 5))".to_string(),
+            },
+            TestCase {
+                input: "!(true == true)".to_string(),
+                expected: "(!(true == true))".to_string(),
             },
         ];
 
@@ -436,10 +726,43 @@ mod tests {
 
     #[test]
     fn test_prefix_expressions() {
-        let test_cases = vec![("!5;", "!", 5), ("-15;", "-", 15)];
+        #[derive(Debug, PartialEq)]
+        enum TestValue {
+            Int(i64),
+            Bool(bool),
+        }
 
-        for (input, expected_operator, expected_value) in test_cases {
-            let lexer = Lexer::new(input.to_string());
+        struct TestCase {
+            input: &'static str,
+            operator: &'static str,
+            right_value: TestValue,
+        }
+
+        let test_cases = vec![
+            TestCase {
+                input: "!5;",
+                operator: "!",
+                right_value: TestValue::Int(5),
+            },
+            TestCase {
+                input: "-15;",
+                operator: "-",
+                right_value: TestValue::Int(15),
+            },
+            TestCase {
+                input: "!true;",
+                operator: "!",
+                right_value: TestValue::Bool(true),
+            },
+            TestCase {
+                input: "!false;",
+                operator: "!",
+                right_value: TestValue::Bool(false),
+            },
+        ];
+
+        for test in test_cases {
+            let lexer = Lexer::new(test.input.to_string());
             let mut parser = Parser::new(lexer);
             let program = parser.parse_program().expect("Failed to parse program");
 
@@ -466,75 +789,119 @@ mod tests {
                 _ => panic!("Expected PrefixExpression, got {:?}", expression),
             };
 
-            // Verify operator and value
-            assert_eq!(prefix_expr.operator, expected_operator);
+            // Verify operator matches
+            assert_eq!(
+                prefix_expr.operator, test.operator,
+                "Expected operator '{}', got '{}'",
+                test.operator, prefix_expr.operator
+            );
 
-            match &*prefix_expr.right {
-                Expression::IntegerExpression(value) => {
-                    assert_eq!(value.value, expected_value);
+            // Verify right value matches expected type and value
+            match (&*prefix_expr.right, &test.right_value) {
+                (Expression::IntegerExpression(value), TestValue::Int(expected)) => {
+                    assert_eq!(
+                        value.value, *expected,
+                        "Expected integer value {}, got {}",
+                        expected, value.value
+                    );
                 }
-                _ => panic!("Expected IntegerLiteral after prefix operator"),
+                (Expression::BooleanExpression(value), TestValue::Bool(expected)) => {
+                    assert_eq!(
+                        value.value, *expected,
+                        "Expected boolean value {}, got {}",
+                        expected, value.value
+                    );
+                }
+                (expr, expected) => panic!(
+                    "Type mismatch in prefix expression. Expected {:?}, got {:?}",
+                    expected, expr
+                ),
             }
         }
     }
 
     #[test]
     fn test_infix_expression() {
+        #[derive(Debug, PartialEq, Eq)]
+        enum TestValue {
+            Int(i64),
+            Bool(bool),
+        }
+
+        #[derive(Debug, PartialEq, Eq)]
         struct TestCase {
             input: &'static str,
-            left_value: i64,
+            left_value: TestValue,
             operator: &'static str,
-            right_value: i64,
+            right_value: TestValue,
         }
 
         let tests = vec![
             TestCase {
                 input: "5 + 5;",
-                left_value: 5,
+                left_value: TestValue::Int(5),
                 operator: "+",
-                right_value: 5,
+                right_value: TestValue::Int(5),
             },
             TestCase {
                 input: "5 - 5;",
-                left_value: 5,
+                left_value: TestValue::Int(5),
                 operator: "-",
-                right_value: 5,
+                right_value: TestValue::Int(5),
             },
             TestCase {
                 input: "5 * 5;",
-                left_value: 5,
+                left_value: TestValue::Int(5),
                 operator: "*",
-                right_value: 5,
+                right_value: TestValue::Int(5),
             },
             TestCase {
                 input: "5 / 5;",
-                left_value: 5,
+                left_value: TestValue::Int(5),
                 operator: "/",
-                right_value: 5,
+                right_value: TestValue::Int(5),
             },
             TestCase {
                 input: "5 > 5;",
-                left_value: 5,
+                left_value: TestValue::Int(5),
                 operator: ">",
-                right_value: 5,
+                right_value: TestValue::Int(5),
             },
             TestCase {
                 input: "5 < 5;",
-                left_value: 5,
+                left_value: TestValue::Int(5),
                 operator: "<",
-                right_value: 5,
+                right_value: TestValue::Int(5),
             },
             TestCase {
                 input: "5 == 5;",
-                left_value: 5,
+                left_value: TestValue::Int(5),
                 operator: "==",
-                right_value: 5,
+                right_value: TestValue::Int(5),
             },
             TestCase {
                 input: "5 != 5;",
-                left_value: 5,
+                left_value: TestValue::Int(5),
                 operator: "!=",
-                right_value: 5,
+                right_value: TestValue::Int(5),
+            },
+            TestCase {
+                input: "true == true",
+                left_value: TestValue::Bool(true),
+                operator: "==",
+                right_value: TestValue::Bool(true),
+            },
+            TestCase {
+                input: "true != false",
+                left_value: TestValue::Bool(true),
+                operator: "!=",
+                right_value: TestValue::Bool(false),
+            },
+            TestCase {
+                input: "false == false",
+                left_value: TestValue::Bool(false),
+                operator: "==",
+                right_value: TestValue::Bool(false),
             },
         ];
 
@@ -573,31 +940,22 @@ mod tests {
                 _ => panic!("exp is not InfixExpression. got={:?}", expr_stmt.expression),
             };
 
-            // // Verify left value
-            match &*infix_expr.left {
-                Expression::IntegerExpression(i) => assert_eq!(
-                    i.value, test.left_value,
-                    "left value not {}. got={}",
-                    test.left_value, i.value
-                ),
-                _ => panic!("left is not IntegerLiteral"),
+            // Verify left value
+
+            match (&*infix_expr.left, &test.left_value) {
+                (Expression::IntegerExpression(i), TestValue::Int(v)) => assert_eq!(i.value, *v),
+                (Expression::BooleanExpression(b), TestValue::Bool(v)) => assert_eq!(b.value, *v),
+                _ => panic!("Type mismatch in left value"),
             }
 
             // Verify operator
-            assert_eq!(
-                infix_expr.operator, test.operator,
-                "exp.Operator is not '{}'. got='{}'",
-                test.operator, infix_expr.operator
-            );
+            assert_eq!(infix_expr.operator, test.operator);
 
             // Verify right value
-            match &*infix_expr.right {
-                Expression::IntegerExpression(i) => assert_eq!(
-                    i.value, test.right_value,
-                    "right value not {}. got={}",
-                    test.right_value, i.value
-                ),
-                _ => panic!("right is not IntegerLiteral"),
+            match (&*infix_expr.right, &test.right_value) {
+                (Expression::IntegerExpression(i), TestValue::Int(v)) => assert_eq!(i.value, *v),
+                (Expression::BooleanExpression(b), TestValue::Bool(v)) => assert_eq!(b.value, *v),
+                _ => panic!("Type mismatch in right value"),
             }
         }
     }
