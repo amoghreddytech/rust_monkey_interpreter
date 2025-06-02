@@ -11,18 +11,18 @@ impl AbstractSyntaxTree {
         }
     }
 
-    fn token_literal(&self) -> String {
+    pub fn token_literal(&self) -> String {
         self.statements
             .first()
             .map(|stmt| stmt.token_literal())
             .unwrap_or_default()
     }
 
-    fn string_representation(&self) -> String {
+    pub fn string_representation(&self) -> String {
         let mut buffer = String::new();
 
         for stmt in &self.statements {
-            buffer.push_str(stmt.string_representation());
+            buffer.push_str(&stmt.string_representation());
         }
 
         buffer

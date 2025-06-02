@@ -16,11 +16,13 @@ impl Statement {
         }
     }
 
-    pub fn string_representation(&self) -> &str {
+    pub fn string_representation(&self) -> String {
         match self {
-            Statement::LetStatement(let_statement) => todo!(),
-            Statement::ReturnStatement(return_statement) => todo!(),
-            Statement::ExpressionStatement(expression_statement) => todo!(),
+            Statement::LetStatement(let_statement) => let_statement.string_literal(),
+            Statement::ReturnStatement(return_statement) => return_statement.string_literal(),
+            Statement::ExpressionStatement(expression_statement) => {
+                expression_statement.string_literal()
+            }
         }
     }
 }
