@@ -2,11 +2,11 @@ use crate::TokenType;
 use anyhow::{Error, Result, anyhow};
 
 #[derive(Debug, Clone)]
-pub struct Identifier {
+pub struct IdentifierLiteral {
     pub value: String,
 }
 
-impl Identifier {
+impl IdentifierLiteral {
     pub fn new(token: TokenType) -> Result<Self, Error> {
         match token {
             TokenType::IDENT(ref value) => Ok(Self {

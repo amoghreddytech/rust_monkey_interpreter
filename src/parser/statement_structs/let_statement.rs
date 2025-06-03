@@ -1,6 +1,6 @@
 use crate::{
     TokenType,
-    parser::{Expression, Identifier},
+    parser::{Expression, IdentifierLiteral},
 };
 
 // LET STATEMENT
@@ -8,12 +8,12 @@ use crate::{
 pub struct LetStatement {
     // This is going to be the let Token,
     pub token: TokenType,
-    pub identifier: Identifier,
+    pub identifier: IdentifierLiteral,
     pub value: Option<Expression>,
 }
 
 impl LetStatement {
-    pub fn new(token: TokenType, identifier: Identifier, value: Option<Expression>) -> Self {
+    pub fn new(token: TokenType, identifier: IdentifierLiteral, value: Option<Expression>) -> Self {
         Self {
             token,
             identifier,

@@ -1,16 +1,18 @@
 use super::{
-    BooleanLiteral, Identifier, IfLiteral, InfixLiteral, IntegerLiteral, PrefixLiteral,
-    expression_structs::if_literal,
+    BooleanLiteral, CallLiteral, FunctionLiteral, IdentifierLiteral, IfLiteral, InfixLiteral,
+    IntegerLiteral, PrefixLiteral,
 };
 
 #[derive(Debug, Clone)]
 pub enum Expression {
-    IdentiferExpression(Identifier),
+    IdentiferExpression(IdentifierLiteral),
     IntegerExpression(IntegerLiteral),
     PrefixExpression(PrefixLiteral),
     InfixExpression(InfixLiteral),
     BooleanExpression(BooleanLiteral),
     IfExpression(IfLiteral),
+    FunctionExpression(FunctionLiteral),
+    CallExpression(CallLiteral),
 }
 
 impl Expression {
@@ -22,12 +24,14 @@ impl Expression {
             Self::InfixExpression(infix_literal) => infix_literal.token.token_literal(),
             Self::BooleanExpression(boolean_literal) => boolean_literal.value.to_string(),
             Self::IfExpression(if_literal) => if_literal.token.token_literal(),
+            Self::FunctionExpression(func_literal) => func_literal.token.token_literal(),
+            Self::CallExpression(call_literal) => call_literal.token.token_literal(),
         }
     }
 
     pub fn string_literal(&self) -> String {
         match self {
-            Expression::IdentiferExpression(identifier) => identifier.value.clone(),
+            Self::IdentiferExpression(identifier) => identifier.value.clone(),
             Self::IntegerExpression(integer_data) => integer_data.value.to_string(),
             Self::PrefixExpression(prefix_literal) => {
                 format!(
@@ -57,6 +61,33 @@ impl Expression {
                 }
 
                 s
+            }
+
+            Self::FunctionExpression(func_literal) => {
+                let params: String = func_literal
+                    .parameters
+                    .iter()
+                    .map(|c| c.string_literal())
+                    .collect::<Vec<String>>()
+                    .join(", ");
+
+                format!(
+                    "{}({}){}",
+                    func_literal.token.token_literal(),
+                    params,
+                    func_literal.body.string_representation()
+                )
+            }
+
+            Self::CallExpression(call_literal) => {
+                let arguments: String = call_literal
+                    .arguments
+                    .iter()
+                    .map(|a| a.string_literal())
+                    .collect::<Vec<String>>()
+                    .join(", ");
+
+                format!("{}({})", call_literal.function.string_literal(), arguments,)
             }
         }
     }
