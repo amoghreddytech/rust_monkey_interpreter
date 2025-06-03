@@ -664,6 +664,22 @@ mod tests {
                 input: "!(true == true)".to_string(),
                 expected: "(!(true == true))".to_string(),
             },
+            TestCase {
+                input: "a + add(b * c) + d".to_string(),
+                expected: "((a + add((b * c))) + d)".to_string(),
+            },
+            TestCase {
+                input: "a + add(b * c) + d".to_string(),
+                expected: "((a + add((b * c))) + d)".to_string(),
+            },
+            TestCase {
+                input: "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))".to_string(),
+                expected: "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))".to_string(),
+            },
+            TestCase {
+                input: "add(a + b + c * d / f + g)".to_string(),
+                expected: "add((((a + b) + ((c * d) / f)) + g))".to_string(),
+            },
         ];
 
         for test in tests {
