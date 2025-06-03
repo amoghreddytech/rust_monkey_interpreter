@@ -1,9 +1,7 @@
-use std::fs::File;
-
 use super::{
-    AbstractSyntaxTree, BlockStatement, BooleanLiteral, Expression, ExpressionStatement,
-    FunctionLiteral, IdentifierLiteral, IfLiteral, InfixLiteral, IntegerLiteral, LetStatement,
-    PrefixLiteral, ReturnStatement, Statement,
+    AbstractSyntaxTree, BlockStatement, BooleanLiteral, CallLiteral, Expression,
+    ExpressionStatement, FunctionLiteral, IdentifierLiteral, IfLiteral, InfixLiteral,
+    IntegerLiteral, LetStatement, PrefixLiteral, ReturnStatement, Statement,
 };
 use crate::{Lexer, PRECEDENCE, TokenType};
 use anyhow::{Error, Result, anyhow};
@@ -144,7 +142,6 @@ impl Parser {
             TokenType::LPAREN => self.parse_grouped_expressions()?,
             TokenType::IF => self.parse_if_expression()?,
             TokenType::FUNCTION => self.parse_function_expression()?,
-            TokenType::LPAREN => self.parse_call_expresiion()?,
 
             _ => return Err(anyhow!("no prefix parse function for {:?}", self.cur_token)),
         };
@@ -152,7 +149,13 @@ impl Parser {
         while !self.peek_token_is(TokenType::SEMICOLON)
             && precedence < self.peek_token.get_precedence()
         {
-            if let Some(infix_token) = self.peek_token.get_infix_token() {
+            if self.peek_token_is(TokenType::LPAREN) {
+                self.next_token();
+                left_exp = self.parse_call_expresiion(Box::new(left_exp))?;
+                continue;
+            }
+
+            if let Some(_) = self.peek_token.get_infix_token() {
                 self.next_token();
                 left_exp = self.parse_infix_expression(Box::new(left_exp))?;
             } else {
@@ -281,8 +284,11 @@ impl Parser {
         return Ok(parameters);
     }
 
-    fn parse_call_expresiion(&self) -> Result<Expression, Error> {
-        todo!()
+    fn parse_call_expresiion(&mut self, function: Box<Expression>) -> Result<Expression, Error> {
+        let token = self.cur_token.clone();
+        let arguments = self.parse_call_arguments()?;
+        let call_literal = CallLiteral::new(token, function, arguments)?;
+        Ok(Expression::CallExpression(call_literal))
     }
 
     fn parse_call_arguments(&mut self) -> Result<Vec<Box<Expression>>, Error> {
@@ -1201,6 +1207,103 @@ mod tests {
                 }
             }
             _ => panic!("Function body is not BlockStatement"),
+        }
+    }
+
+    #[test]
+    fn test_call_expression_parsing() {
+        let input = "add(1, 2 * 3, 4 + 5);";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().unwrap();
+
+        // Check parser errors
+        assert!(
+            parser.errors.is_empty(),
+            "Parser had errors: {:?}",
+            parser.errors
+        );
+
+        // Check statement count
+        assert_eq!(
+            program.statements.len(),
+            1,
+            "program.statements does not contain 1 statement. got={}",
+            program.statements.len()
+        );
+
+        // Check statement type
+        let stmt = match &program.statements[0] {
+            Statement::ExpressionStatement(stmt) => stmt,
+            _ => panic!(
+                "stmt is not ExpressionStatement. got={:?}",
+                program.statements[0]
+            ),
+        };
+
+        // Check expression type
+        let exp = match &*stmt.expression {
+            Expression::CallExpression(exp) => exp,
+            _ => panic!(
+                "stmt.Expression is not CallExpression. got={:?}",
+                stmt.expression
+            ),
+        };
+
+        // Check function identifier
+        match &*exp.function {
+            Expression::IdentiferExpression(ident) => assert_eq!(
+                ident.value, "add",
+                "expected function name 'add', got '{}'",
+                ident.value
+            ),
+            _ => panic!("function is not Identifier"),
+        }
+
+        // Check argument count
+        assert_eq!(
+            exp.arguments.len(),
+            3,
+            "wrong length of arguments. got={}",
+            exp.arguments.len()
+        );
+
+        // Test first argument (1)
+        match &*exp.arguments[0] {
+            Expression::IntegerExpression(int) => assert_eq!(int.value, 1),
+            _ => panic!("first argument is not IntegerLiteral"),
+        }
+
+        // Test second argument (2 * 3)
+        match &*exp.arguments[1] {
+            Expression::InfixExpression(infix) => {
+                match &*infix.left {
+                    Expression::IntegerExpression(int) => assert_eq!(int.value, 2),
+                    _ => panic!("left operand is not 2"),
+                }
+                assert_eq!(infix.operator, "*");
+                match &*infix.right {
+                    Expression::IntegerExpression(int) => assert_eq!(int.value, 3),
+                    _ => panic!("right operand is not 3"),
+                }
+            }
+            _ => panic!("second argument is not InfixExpression"),
+        }
+
+        // // Test third argument (4 + 5)
+        match &*exp.arguments[2] {
+            Expression::InfixExpression(infix) => {
+                match &*infix.left {
+                    Expression::IntegerExpression(int) => assert_eq!(int.value, 4),
+                    _ => panic!("left operand is not 4"),
+                }
+                assert_eq!(infix.operator, "+");
+                match &*infix.right {
+                    Expression::IntegerExpression(int) => assert_eq!(int.value, 5),
+                    _ => panic!("right operand is not 5"),
+                }
+            }
+            _ => panic!("third argument is not InfixExpression"),
         }
     }
 }

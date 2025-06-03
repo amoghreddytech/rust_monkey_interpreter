@@ -1,3 +1,4 @@
+#![allow(warnings)]
 mod ast;
 // mod errors;
 // mod evaluator;
@@ -8,4 +9,4 @@ mod parser;
 mod token;
 
 pub use lexer::lexer::Lexer;
-pub use token::token::TokenType;
+pub use token::token::{PRECEDENCE, TokenType};

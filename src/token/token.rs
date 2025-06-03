@@ -87,6 +87,20 @@ impl TokenType {
         }
     }
 
+    pub fn get_infix_token(&self) -> Option<TokenType> {
+        match self {
+            TokenType::PLUS
+            | TokenType::MINUS
+            | TokenType::SLASH
+            | TokenType::ASTERISK
+            | TokenType::EQ
+            | TokenType::NOTEQ
+            | TokenType::LT
+            | TokenType::GT => Some(self.clone()),
+            _ => None,
+        }
+    }
+
     pub fn get_precedence(&self) -> PRECEDENCE {
         match &self {
             TokenType::EQ | TokenType::NOTEQ => PRECEDENCE::EQUALS,
