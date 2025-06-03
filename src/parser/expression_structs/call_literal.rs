@@ -16,7 +16,7 @@ impl CallLiteral {
         arguments: Vec<Box<Expression>>,
     ) -> Result<Self, Error> {
         match &*function {
-            Expression::FunctionExpression(fe) => Ok(Self {
+            Expression::IdentiferExpression(_) | Expression::FunctionExpression(_) => Ok(Self {
                 token,
                 function,
                 arguments,

@@ -144,6 +144,7 @@ impl Parser {
             TokenType::LPAREN => self.parse_grouped_expressions()?,
             TokenType::IF => self.parse_if_expression()?,
             TokenType::FUNCTION => self.parse_function_expression()?,
+            TokenType::LPAREN => self.parse_call_expresiion()?,
 
             _ => return Err(anyhow!("no prefix parse function for {:?}", self.cur_token)),
         };
@@ -278,6 +279,35 @@ impl Parser {
         self.is_peek_and_move(TokenType::RPAREN)?;
 
         return Ok(parameters);
+    }
+
+    fn parse_call_expresiion(&self) -> Result<Expression, Error> {
+        todo!()
+    }
+
+    fn parse_call_arguments(&mut self) -> Result<Vec<Box<Expression>>, Error> {
+        let mut arguments = Vec::new();
+
+        if self.peek_token_is(TokenType::RPAREN) {
+            self.next_token();
+            return Ok(arguments);
+        }
+
+        self.next_token();
+        let first_argument = self.parse_expression(PRECEDENCE::LOWEST)?;
+        arguments.push(Box::new(first_argument));
+
+        while self.peek_token_is(TokenType::COMMA) {
+            self.next_token();
+            self.next_token();
+
+            let argument = self.parse_expression(PRECEDENCE::LOWEST)?;
+            arguments.push(Box::new(argument));
+        }
+
+        self.is_peek_and_move(TokenType::RPAREN)?;
+
+        return Ok(arguments);
     }
 
     fn parse_prefix_expression(&mut self) -> Result<Expression, Error> {
