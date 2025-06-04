@@ -96,11 +96,15 @@ impl Parser {
 
         self.is_peek_and_move(TokenType::ASSIGN)?;
 
-        while !self.cur_token_is(TokenType::SEMICOLON) && !self.cur_token_is(TokenType::EOF) {
+        self.next_token();
+
+        let expression = self.parse_expression(PRECEDENCE::LOWEST)?;
+
+        if self.peek_token_is(TokenType::SEMICOLON) {
             self.next_token();
         }
 
-        let let_statment = LetStatement::new(token, identifier, None);
+        let let_statment = LetStatement::new(token, identifier, expression);
 
         Ok(Statement::LetStatement(let_statment))
     }
@@ -110,11 +114,13 @@ impl Parser {
 
         self.next_token();
 
-        while !self.cur_token_is(TokenType::SEMICOLON) && !self.cur_token_is(TokenType::EOF) {
+        let expression = self.parse_expression(PRECEDENCE::LOWEST)?;
+
+        if self.peek_token_is(TokenType::SEMICOLON) {
             self.next_token();
         }
 
-        let return_statement = ReturnStatement::new(token);
+        let return_statement = ReturnStatement::new(token, expression);
 
         Ok(Statement::ReturnStatement(return_statement))
     }

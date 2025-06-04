@@ -5,14 +5,14 @@ use crate::{TokenType, parser::Expression};
 pub struct ReturnStatement {
     // This is going to be the let Token,
     pub token: TokenType,
-    pub return_value: Option<Expression>,
+    pub return_value: Expression,
 }
 
 impl ReturnStatement {
-    pub fn new(token: TokenType) -> Self {
+    pub fn new(token: TokenType, expression: Expression) -> Self {
         Self {
             token,
-            return_value: None,
+            return_value: expression,
         }
     }
 
@@ -21,9 +21,7 @@ impl ReturnStatement {
 
         buffer.push_str(&self.token.token_literal());
 
-        if let Some(return_value) = &self.return_value {
-            buffer.push_str(&return_value.string_literal());
-        }
+        buffer.push_str(&self.return_value.string_literal());
         buffer.push_str(&";");
 
         buffer

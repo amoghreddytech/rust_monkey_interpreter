@@ -9,15 +9,15 @@ pub struct LetStatement {
     // This is going to be the let Token,
     pub token: TokenType,
     pub identifier: IdentifierLiteral,
-    pub value: Option<Expression>,
+    pub value: Expression,
 }
 
 impl LetStatement {
-    pub fn new(token: TokenType, identifier: IdentifierLiteral, value: Option<Expression>) -> Self {
+    pub fn new(token: TokenType, identifier: IdentifierLiteral, value: Expression) -> Self {
         Self {
             token,
             identifier,
-            value: None,
+            value,
         }
     }
 
@@ -29,9 +29,7 @@ impl LetStatement {
         buffer.push_str(&self.identifier.string_literal());
         buffer.push_str(&" = ");
 
-        if let Some(val) = &self.value {
-            buffer.push_str(&val.string_literal());
-        }
+        buffer.push_str(&self.value.string_literal());
 
         buffer.push_str(&";");
 

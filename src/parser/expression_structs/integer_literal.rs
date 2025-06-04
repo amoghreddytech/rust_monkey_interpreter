@@ -19,4 +19,8 @@ impl IntegerLiteral {
             )),
         }
     }
+
+    pub fn get_value(&self) -> i64 {
+        self.value
+    }
 }

@@ -15,4 +15,8 @@ impl BooleanLiteral {
             _ => Err(anyhow!("Not a TRUE OR FALSE Token recieved {:?}", token)),
         }
     }
+
+    pub fn get_value(&self) -> bool {
+        self.value
+    }
 }

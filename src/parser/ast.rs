@@ -1,5 +1,6 @@
 use super::Statement;
 
+#[derive(Debug, Clone)]
 pub struct AbstractSyntaxTree {
     pub statements: Vec<Statement>,
 }

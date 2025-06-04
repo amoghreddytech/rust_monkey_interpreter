@@ -1,7 +1,7 @@
 #![allow(warnings)]
 mod ast;
 // mod errors;
-// mod evaluator;
+mod evaluator;
 mod lexer;
 // mod object;
 mod parser;
