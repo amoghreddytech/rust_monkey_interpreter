@@ -62,7 +62,7 @@ impl Parser {
         }
     }
 
-    fn parse_program(&mut self) -> Result<AbstractSyntaxTree, Vec<Error>> {
+    pub fn parse_program(&mut self) -> Result<AbstractSyntaxTree, Vec<Error>> {
         let mut tree = AbstractSyntaxTree::new();
 
         while self.cur_token != TokenType::EOF {
