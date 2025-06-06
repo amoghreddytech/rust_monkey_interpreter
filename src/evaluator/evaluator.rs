@@ -49,7 +49,7 @@ fn eval_block_statement(block_statment: &BlockStatement, env: Env) -> Result<Obj
 
     for stmt in block_statment.statements.iter() {
         let statement: &Statement = &*stmt;
-        result = eval(Node::StatementNode(stmt), Rc::clone(&Rc::clone(&env)))?;
+        result = eval(Node::StatementNode(stmt), Rc::clone(&env))?;
 
         if matches!(result, Object::Return(_)) {
             return Ok(result);
@@ -65,10 +65,9 @@ fn eval_let_statement(let_statement: &LetStatement, mut env: Env) -> Result<Obje
         Rc::clone(&env),
     )?;
 
-    match env.try_borrow_mut() {
-        Ok(mut env) => env.set(&let_statement.identifier.string_literal(), value.clone()),
-        Err(e) => println!("Borrow error: {:?}", e),
-    }
+    env.try_borrow_mut()
+        .map_err(|e| anyhow!("failed to borrow environment : {:?}", e))?
+        .set(&let_statement.identifier.string_literal(), value.clone());
 
     Ok(value)
 }
