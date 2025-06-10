@@ -1,6 +1,6 @@
 use super::{
     BooleanLiteral, CallLiteral, FunctionLiteral, IdentifierLiteral, IfLiteral, InfixLiteral,
-    IntegerLiteral, PrefixLiteral,
+    IntegerLiteral, PrefixLiteral, StringLiteral,
 };
 
 #[derive(Debug, Clone)]
@@ -13,6 +13,7 @@ pub enum Expression {
     IfExpression(IfLiteral),
     FunctionExpression(FunctionLiteral),
     CallExpression(CallLiteral),
+    StringExpression(StringLiteral),
 }
 
 impl Expression {
@@ -26,6 +27,7 @@ impl Expression {
             Self::IfExpression(if_literal) => if_literal.token.token_literal(),
             Self::FunctionExpression(func_literal) => func_literal.token.token_literal(),
             Self::CallExpression(call_literal) => call_literal.token.token_literal(),
+            Self::StringExpression(string_literal) => string_literal.value.clone(),
         }
     }
 
@@ -88,6 +90,10 @@ impl Expression {
                     .join(", ");
 
                 format!("{}({})", call_literal.function.string_literal(), arguments,)
+            }
+
+            Self::StringExpression(string_literal) => {
+                format!("{}", string_literal.value)
             }
         }
     }

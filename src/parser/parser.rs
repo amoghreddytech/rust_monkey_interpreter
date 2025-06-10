@@ -1,7 +1,7 @@
 use super::{
     AbstractSyntaxTree, BlockStatement, BooleanLiteral, CallLiteral, Expression,
     ExpressionStatement, FunctionLiteral, IdentifierLiteral, IfLiteral, InfixLiteral,
-    IntegerLiteral, LetStatement, PrefixLiteral, ReturnStatement, Statement,
+    IntegerLiteral, LetStatement, PrefixLiteral, ReturnStatement, Statement, StringLiteral,
 };
 use crate::{Lexer, PRECEDENCE, TokenType};
 use anyhow::{Error, Result, anyhow};
@@ -148,6 +148,7 @@ impl Parser {
             TokenType::LPAREN => self.parse_grouped_expressions()?,
             TokenType::IF => self.parse_if_expression()?,
             TokenType::FUNCTION => self.parse_function_expression()?,
+            TokenType::String(_) => self.parse_string_expression()?,
 
             _ => return Err(anyhow!("no prefix parse function for {:?}", self.cur_token)),
         };
@@ -348,6 +349,12 @@ impl Parser {
 
         Ok(Expression::InfixExpression(infix_literal))
     }
+
+    fn parse_string_expression(&mut self) -> Result<Expression, Error> {
+        let token = self.cur_token.clone();
+        let string_literal = StringLiteral::new(token)?;
+        Ok(Expression::StringExpression(string_literal))
+    }
 }
 
 #[cfg(test)]
@@ -357,6 +364,38 @@ mod tests {
         Lexer,
         parser::{Expression, Statement},
     };
+
+    #[test]
+    fn test_string_literal_expression() {
+        let input = "\"hello world\"";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().expect("Failed to parse program");
+        check_parse_errors(&parser);
+        assert!(
+            &parser.errors.is_empty(),
+            "Parser errors: {:?}",
+            &parser.errors
+        );
+
+        println!("{:?}", program.statements);
+
+        // Verify it's an expression statement
+        let stmt = match &program.statements[0] {
+            Statement::ExpressionStatement(s) => s,
+            _ => panic!(
+                "program.statements[0] is not ExpressionStatement. got={:?}",
+                program.statements[0]
+            ),
+        };
+
+        match *stmt.expression {
+            Expression::StringExpression(ref s) => {
+                assert_eq!(s.value, "hello world".to_string());
+            }
+            _ => panic!("not a string expression"),
+        }
+    }
 
     #[test]
     fn test_let_statement_parsing() {

@@ -6,3 +6,4 @@ pub mod if_literal;
 pub mod infix_literal;
 pub mod integer_literal;
 pub mod prefix_literal;
+pub mod string_literal;

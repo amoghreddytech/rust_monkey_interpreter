@@ -1,4 +1,4 @@
-use std::{borrow::BorrowMut, cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use anyhow::{Error, Result, anyhow};
 
@@ -111,6 +111,7 @@ fn eval_expression(expr: &Expression, env: Env) -> Result<Object, Error> {
         Expression::IfExpression(ie) => eval_if_literal(ie, Rc::clone(&env))?,
         Expression::FunctionExpression(fe) => evaluate_function_literal(fe, Rc::clone(&env))?,
         Expression::CallExpression(ce) => evaluate_call_expression(ce, Rc::clone(&env))?,
+        _ => Object::Null,
     };
 
     Ok(object)
@@ -280,7 +281,6 @@ fn eval_if_literal(if_literal: &IfLiteral, env: Env) -> Result<Object, Error> {
 
 #[cfg(test)]
 mod tests {
-    use std::{borrow::Borrow, panic::RefUnwindSafe};
 
     use crate::{Lexer, evaluator, parser::parser::Parser};
 

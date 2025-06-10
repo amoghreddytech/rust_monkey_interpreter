@@ -76,6 +76,10 @@ impl Lexer {
             b'>' => TokenType::GT,
             b'{' => TokenType::LBRACE,
             b'}' => TokenType::RBRACE,
+            b'"' => {
+                let string = self.read_string().to_string();
+                TokenType::String(string)
+            }
             0 => TokenType::EOF,
             _ => {
                 if self.is_letter() {
@@ -94,6 +98,17 @@ impl Lexer {
         token
     }
 
+    fn read_string(&mut self) -> &str {
+        let starting_pos = self.position + 1;
+        loop {
+            self.read_char();
+            if self.ch == b'"' || self.ch == b'0' {
+                break;
+            }
+        }
+
+        return &self.input[starting_pos..self.position];
+    }
     fn read_identifier(&mut self) -> &str {
         let pos = self.position;
 
@@ -193,6 +208,9 @@ if (5 < 10) {
 10 == 10;
 10 != 9;
 
+\"foobar\"
+\"foo bar\"
+
 ";
         let mut l = Lexer::new(input.to_string());
         assert_eq!(l.next_token(), TokenType::LET);
@@ -268,6 +286,10 @@ if (5 < 10) {
         assert_eq!(l.next_token(), TokenType::NOTEQ);
         assert_eq!(l.next_token(), TokenType::INT("9".to_string()));
         assert_eq!(l.next_token(), TokenType::SEMICOLON);
+        assert_eq!(l.next_token(), TokenType::String("foobar".to_string()));
+        assert_eq!(l.next_token(), TokenType::String("foo bar".to_string()));
+        assert_eq!(l.next_token(), TokenType::EOF);
+
         assert_eq!(l.next_token(), TokenType::EOF);
     }
 }

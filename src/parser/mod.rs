@@ -16,6 +16,7 @@ pub use expression_structs::if_literal::IfLiteral;
 pub use expression_structs::infix_literal::InfixLiteral;
 pub use expression_structs::integer_literal::IntegerLiteral;
 pub use expression_structs::prefix_literal::PrefixLiteral;
+pub use expression_structs::string_literal::StringLiteral;
 
 pub use statement::Statement;
 pub use statement_structs::block_statement::BlockStatement;

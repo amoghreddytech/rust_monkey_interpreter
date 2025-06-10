@@ -22,6 +22,7 @@ pub enum TokenType {
     // identifiers + literals
     IDENT(String),
     INT(String),
+    String(String),
 
     // Operators
     ASSIGN,
@@ -84,6 +85,7 @@ impl TokenType {
             TokenType::IF => "if".to_string(),
             TokenType::ELSE => "else".to_string(),
             TokenType::RETURN => "return".to_string(),
+            TokenType::String(i) => i.to_owned(),
         }
     }
 
