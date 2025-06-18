@@ -1,6 +1,6 @@
 use super::{
-    BooleanLiteral, CallLiteral, FunctionLiteral, IdentifierLiteral, IfLiteral, InfixLiteral,
-    IntegerLiteral, PrefixLiteral, StringLiteral,
+    ArrayLiteral, BooleanLiteral, CallLiteral, FunctionLiteral, IdentifierLiteral, IfLiteral,
+    IndexLiteral, InfixLiteral, IntegerLiteral, PrefixLiteral, StringLiteral,
 };
 
 #[derive(Debug, Clone)]
@@ -14,6 +14,8 @@ pub enum Expression {
     FunctionExpression(FunctionLiteral),
     CallExpression(CallLiteral),
     StringExpression(StringLiteral),
+    ArrayExpression(ArrayLiteral),
+    IndexExpression(IndexLiteral),
 }
 
 impl Expression {
@@ -28,6 +30,8 @@ impl Expression {
             Self::FunctionExpression(func_literal) => func_literal.token.token_literal(),
             Self::CallExpression(call_literal) => call_literal.token.token_literal(),
             Self::StringExpression(string_literal) => string_literal.value.clone(),
+            Self::ArrayExpression(array_literal) => array_literal.token.token_literal(),
+            Self::IndexExpression(index_literal) => index_literal.token.token_literal(),
         }
     }
 
@@ -94,6 +98,21 @@ impl Expression {
 
             Self::StringExpression(string_literal) => {
                 format!("{}", string_literal.value)
+            }
+
+            Self::ArrayExpression(array_literal) => {
+                let mut elements = Vec::new();
+
+                for element in &array_literal.elements {
+                    elements.push(element.string_literal().clone());
+                }
+
+                format!("[{}]", elements.join(", "))
+            }
+            Self::IndexExpression(index_literal) => {
+                let left_string_literal = index_literal.left.string_literal();
+                let index_string_literal = index_literal.index.string_literal();
+                format!("({}[{}])", left_string_literal, index_string_literal)
             }
         }
     }
