@@ -112,6 +112,8 @@ fn eval_expression(expr: &Expression, env: Env) -> Result<Object, Error> {
         Expression::FunctionExpression(fe) => evaluate_function_literal(fe, Rc::clone(&env))?,
         Expression::CallExpression(ce) => evaluate_call_expression(ce, Rc::clone(&env))?,
         Expression::StringExpression(se) => evaluate_string_expression(se, Rc::clone(&env))?,
+        Expression::ArrayExpression(ae) => todo!(),
+        Expression::IndexExpression(ie) => todo!(),
     };
 
     Ok(object)
@@ -159,6 +161,7 @@ fn apply_function(function: Object, args: Vec<Object>) -> Result<Object, Error> 
             let evalated = eval(Node::StatementNode(&func.body), Rc::clone(&extend_env))?;
             Ok(unwrap_return_value(evalated))
         }
+        Object::Builtin(built_in_fn) => built_in_fn(args),
         _ => Err(anyhow!("Not a function : {}", function.get_type())),
     }
 }
@@ -308,6 +311,50 @@ mod tests {
             Object::Integer(value) => assert_eq!(*value, expected, "object has wrong value"),
             _ => panic!("object is not Integer. got={:?}", obj),
         }
+    }
+
+    #[test]
+    fn test_builtin_functions() -> Result<(), Error> {
+        struct TestCase {
+            input: &'static str,
+            expected: ExpectedValue,
+        }
+
+        enum ExpectedValue {
+            Int(i64),
+            Str(&'static str), // For error messages
+        }
+
+        let tests = vec![
+            TestCase {
+                input: r#"len("")"#,
+                expected: ExpectedValue::Int(0),
+            },
+            TestCase {
+                input: r#"len("four")"#,
+                expected: ExpectedValue::Int(4),
+            },
+            TestCase {
+                input: r#"len("hello world")"#,
+                expected: ExpectedValue::Int(11),
+            },
+        ];
+
+        for tt in tests {
+            let result = test_eval(tt.input)?;
+
+            match result {
+                Object::Integer(x) => match tt.expected {
+                    ExpectedValue::Int(y) => assert_eq!(x, y),
+                    _ => panic!(),
+                },
+                _ => panic!(),
+            }
+
+            println!("{:?}", result);
+        }
+
+        Ok(())
     }
 
     #[test]
