@@ -11,6 +11,7 @@ pub enum PRECEDENCE {
     PRODUCT = 5,
     PREFIX = 6,
     CALL = 7,
+    INDEX = 8,
 }
 
 #[allow(dead_code)]
@@ -114,6 +115,7 @@ impl TokenType {
             TokenType::PLUS | TokenType::MINUS => PRECEDENCE::SUM,
             TokenType::SLASH | TokenType::ASTERISK => PRECEDENCE::PRODUCT,
             TokenType::LPAREN => PRECEDENCE::CALL,
+            TokenType::LBACKET => PRECEDENCE::INDEX,
             _ => PRECEDENCE::LOWEST,
         }
     }
