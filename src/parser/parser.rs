@@ -1,6 +1,6 @@
 use super::{
-    AbstractSyntaxTree, BlockStatement, BooleanLiteral, CallLiteral, Expression,
-    ExpressionStatement, FunctionLiteral, IdentifierLiteral, IfLiteral, InfixLiteral,
+    AbstractSyntaxTree, ArrayLiteral, BlockStatement, BooleanLiteral, CallLiteral, Expression,
+    ExpressionStatement, FunctionLiteral, IdentifierLiteral, IfLiteral, IndexLiteral, InfixLiteral,
     IntegerLiteral, LetStatement, PrefixLiteral, ReturnStatement, Statement, StringLiteral,
 };
 use crate::{Lexer, PRECEDENCE, TokenType};
@@ -148,6 +148,8 @@ impl Parser {
             TokenType::LPAREN => self.parse_grouped_expressions()?,
             TokenType::IF => self.parse_if_expression()?,
             TokenType::FUNCTION => self.parse_function_expression()?,
+            TokenType::LBACKET => self.parse_array_literal()?,
+
             TokenType::String(_) => self.parse_string_expression()?,
 
             _ => return Err(anyhow!("no prefix parse function for {:?}", self.cur_token)),
@@ -162,6 +164,12 @@ impl Parser {
                 continue;
             }
 
+            if self.peek_token_is(TokenType::LBACKET) {
+                self.next_token();
+                left_exp = self.parse_index_expression(Box::new(left_exp))?;
+                continue;
+            }
+
             if let Some(_) = self.peek_token.get_infix_token() {
                 self.next_token();
                 left_exp = self.parse_infix_expression(Box::new(left_exp))?;
@@ -171,6 +179,54 @@ impl Parser {
         }
 
         Ok(left_exp)
+    }
+
+    fn parse_index_expression(&mut self, left: Box<Expression>) -> Result<Expression, Error> {
+        let token = self.cur_token.clone();
+
+        self.next_token();
+
+        let index_expression = Box::new(self.parse_expression(PRECEDENCE::LOWEST)?);
+
+        self.is_peek_and_move(TokenType::RBRAKCET);
+
+        let index_literal = IndexLiteral::new(token, left, index_expression);
+
+        Ok(Expression::IndexExpression(index_literal))
+    }
+
+    fn parse_array_literal(&mut self) -> Result<Expression, Error> {
+        let token = self.cur_token.clone();
+        let elements = self.parse_expression_list(TokenType::RBRAKCET)?;
+
+        let array_literal = ArrayLiteral::new(token, elements)?;
+
+        return Ok(Expression::ArrayExpression(array_literal));
+    }
+
+    fn parse_expression_list(&mut self, end: TokenType) -> Result<Vec<Box<Expression>>, Error> {
+        let mut list: Vec<Box<Expression>> = Vec::new();
+
+        if self.peek_token_is(end.clone()) {
+            self.next_token();
+            return Ok(list);
+        }
+
+        self.next_token();
+
+        let first_expression = Box::new(self.parse_expression(PRECEDENCE::LOWEST)?);
+        list.push(first_expression);
+
+        while self.peek_token_is(TokenType::COMMA) {
+            self.next_token();
+            self.next_token();
+            let expression = Box::new(self.parse_expression(PRECEDENCE::LOWEST)?);
+            list.push(expression)
+        }
+
+        self.is_peek_and_move(end);
+
+        return Ok(list);
     }
 
     fn parse_grouped_expressions(&mut self) -> Result<Expression, Error> {
@@ -366,6 +422,154 @@ mod tests {
     };
 
     #[test]
+    fn test_parsing_index_expression() {
+        let input = "myArray[1 + 1]";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().expect("Failed to parse Program");
+        check_parse_errors(&parser);
+
+        assert!(
+            &parser.errors.is_empty(),
+            "Parser errors: {:?}",
+            &parser.errors
+        );
+
+        let stmt = match &program.statements[0] {
+            Statement::ExpressionStatement(s) => s,
+            _ => panic!(
+                "program.statements[0] is not ExpressionStatement. got={:?}",
+                program.statements[0]
+            ),
+        };
+
+        match *stmt.expression {
+            Expression::IndexExpression(ref il) => {
+                match *il.left {
+                    Expression::IdentiferExpression(ref s) => {
+                        assert_eq!(s.value, "myArray".to_string());
+                    }
+                    _ => panic!("Not an identifier expression"),
+                }
+
+                match *il.index {
+                    Expression::InfixExpression(ref ie) => {
+                        assert_eq!(ie.operator, "+");
+                        match *ie.left {
+                            Expression::IntegerExpression(ref ie) => {
+                                assert_eq!(ie.value, 1);
+                            }
+                            _ => {
+                                panic!("left interger literal is wrong expected 2 for second index")
+                            }
+                        }
+
+                        match *ie.right {
+                            Expression::IntegerExpression(ref ie) => {
+                                assert_eq!(ie.value, 1);
+                            }
+                            _ => {
+                                panic!("left interger literal is wrong expected 2 for second index")
+                            }
+                        }
+                    }
+                    _ => panic!("not an index expression"),
+                }
+            }
+
+            _ => panic!("Not an index expression"),
+        }
+    }
+
+    #[test]
+    fn test_parsing_array_literals() {
+        let input = "[1, 2 * 2, 3 + 3]";
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program().expect("Failed to parse program");
+
+        check_parse_errors(&parser);
+
+        assert!(
+            &parser.errors.is_empty(),
+            "Parser errors: {:?}",
+            &parser.errors
+        );
+
+        // Verify it's an expression statement
+        let stmt = match &program.statements[0] {
+            Statement::ExpressionStatement(s) => s,
+            _ => panic!(
+                "program.statements[0] is not ExpressionStatement. got={:?}",
+                program.statements[0]
+            ),
+        };
+
+        match *stmt.expression {
+            Expression::ArrayExpression(ref al) => {
+                assert_eq!(al.elements.len(), 3);
+
+                match *al.elements[0] {
+                    Expression::IntegerExpression(ref ie) => {
+                        assert_eq!(ie.value, 1);
+                    }
+                    _ => panic!("First interger literal is wrong expected 1"),
+                }
+
+                match *al.elements[1] {
+                    Expression::InfixExpression(ref ie) => {
+                        assert_eq!("*", ie.operator);
+                        match *ie.left {
+                            Expression::IntegerExpression(ref ie) => {
+                                assert_eq!(ie.value, 2);
+                            }
+                            _ => {
+                                panic!("left interger literal is wrong expected 2 for second index")
+                            }
+                        }
+
+                        match *ie.right {
+                            Expression::IntegerExpression(ref ie) => {
+                                assert_eq!(ie.value, 2);
+                            }
+                            _ => {
+                                panic!("left interger literal is wrong expected 2 for second index")
+                            }
+                        }
+                    }
+                    _ => panic!("Expred infix expression but got something else"),
+                }
+
+                match *al.elements[2] {
+                    Expression::InfixExpression(ref ie) => {
+                        assert_eq!("+", ie.operator);
+                        match *ie.left {
+                            Expression::IntegerExpression(ref ie) => {
+                                assert_eq!(ie.value, 3);
+                            }
+                            _ => {
+                                panic!("left interger literal is wrong expected 2 for second index")
+                            }
+                        }
+
+                        match *ie.right {
+                            Expression::IntegerExpression(ref ie) => {
+                                assert_eq!(ie.value, 3);
+                            }
+                            _ => {
+                                panic!("left interger literal is wrong expected 2 for second index")
+                            }
+                        }
+                    }
+                    _ => panic!("Expred infix expression but got something else"),
+                }
+            }
+            _ => panic!("not a string expression"),
+        }
+    }
+
+    #[test]
     fn test_string_literal_expression() {
         let input = "\"hello world\"";
         let lexer = Lexer::new(input.to_string());
@@ -377,8 +581,6 @@ mod tests {
             "Parser errors: {:?}",
             &parser.errors
         );
-
-        println!("{:?}", program.statements);
 
         // Verify it's an expression statement
         let stmt = match &program.statements[0] {
@@ -724,6 +926,14 @@ mod tests {
             TestCase {
                 input: "add(a + b + c * d / f + g)".to_string(),
                 expected: "add((((a + b) + ((c * d) / f)) + g))".to_string(),
+            },
+            TestCase {
+                input: "a * [1, 2, 3, 4][b * c] * d".to_string(),
+                expected: "((a * ([1, 2, 3, 4][(b * c)])) * d)".to_string(),
+            },
+            TestCase {
+                input: "add(a * b[2], b[1], 2 * [1, 2][1])".to_string(),
+                expected: "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))".to_string(),
             },
         ];
 
