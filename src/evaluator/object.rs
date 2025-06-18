@@ -5,9 +5,11 @@ use std::{
     rc::Rc,
 };
 
-use anyhow::anyhow;
+use anyhow::{Error, Result, anyhow};
 
 use crate::parser::{IdentifierLiteral, Statement};
+
+use super::builtin;
 
 #[derive(Debug, Clone)]
 pub enum Object {
@@ -17,7 +19,10 @@ pub enum Object {
     Return(Box<Object>),
     Function(FuctionObject),
     String(String),
+    Builtin(BuiltinFunction),
 }
+
+pub type BuiltinFunction = fn(Vec<Object>) -> Result<Object, Error>;
 
 impl Object {
     pub fn get_type(&self) -> &'static str {
@@ -28,6 +33,7 @@ impl Object {
             Self::Return(_) => "Return",
             Self::Function(_) => "Function",
             Self::String(_) => "String",
+            Self::Builtin(_) => "Builtin",
         }
     }
 
@@ -48,6 +54,7 @@ impl Object {
                 format!("fn({}) {{\n{}\n}}", params, fo.body.string_representation())
             }
             Self::String(s) => s,
+            Self::Builtin(_) => "builtin function".to_string(),
         };
     }
 }
@@ -60,10 +67,14 @@ pub struct Environment {
 
 impl Environment {
     pub fn new() -> Self {
-        Self {
+        let mut env = Self {
             store: HashMap::new(),
             outer: None,
-        }
+        };
+
+        env.set("len", Object::Builtin(builtin::len));
+
+        env
     }
 
     pub fn new_enclosed(outer: Rc<RefCell<Environment>>) -> Self {
