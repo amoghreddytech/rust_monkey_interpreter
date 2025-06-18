@@ -1,5 +1,4 @@
 #![allow(warnings)]
-mod ast;
 // mod errors;
 mod evaluator;
 mod lexer;
