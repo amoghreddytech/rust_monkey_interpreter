@@ -81,6 +81,8 @@ impl Lexer {
                 TokenType::String(string)
             }
             0 => TokenType::EOF,
+            b'[' => TokenType::LBACKET,
+            b']' => TokenType::RBRAKCET,
             _ => {
                 if self.is_letter() {
                     let tok_str = self.read_identifier();
@@ -211,6 +213,8 @@ if (5 < 10) {
 \"foobar\"
 \"foo bar\"
 
+[1,2];
+
 ";
         let mut l = Lexer::new(input.to_string());
         assert_eq!(l.next_token(), TokenType::LET);
@@ -288,8 +292,12 @@ if (5 < 10) {
         assert_eq!(l.next_token(), TokenType::SEMICOLON);
         assert_eq!(l.next_token(), TokenType::String("foobar".to_string()));
         assert_eq!(l.next_token(), TokenType::String("foo bar".to_string()));
-        assert_eq!(l.next_token(), TokenType::EOF);
-
+        assert_eq!(l.next_token(), TokenType::LBACKET);
+        assert_eq!(l.next_token(), TokenType::INT("1".to_string()));
+        assert_eq!(l.next_token(), TokenType::COMMA);
+        assert_eq!(l.next_token(), TokenType::INT("2".to_string()));
+        assert_eq!(l.next_token(), TokenType::RBRAKCET);
+        assert_eq!(l.next_token(), TokenType::SEMICOLON);
         assert_eq!(l.next_token(), TokenType::EOF);
     }
 }

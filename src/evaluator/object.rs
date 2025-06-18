@@ -16,6 +16,7 @@ pub enum Object {
     Null,
     Return(Box<Object>),
     Function(FuctionObject),
+    String(String),
 }
 
 impl Object {
@@ -26,6 +27,7 @@ impl Object {
             Self::Null => "Null",
             Self::Return(_) => "Return",
             Self::Function(_) => "Function",
+            Self::String(_) => "String",
         }
     }
 
@@ -45,6 +47,7 @@ impl Object {
 
                 format!("fn({}) {{\n{}\n}}", params, fo.body.string_representation())
             }
+            Self::String(s) => s,
         };
     }
 }

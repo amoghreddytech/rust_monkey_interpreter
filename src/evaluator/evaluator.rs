@@ -5,7 +5,7 @@ use anyhow::{Error, Result, anyhow};
 use crate::parser::{
     AbstractSyntaxTree, BlockStatement, BooleanLiteral, CallLiteral, Expression,
     ExpressionStatement, FunctionLiteral, IdentifierLiteral, IfLiteral, InfixLiteral,
-    IntegerLiteral, LetStatement, PrefixLiteral, ReturnStatement, Statement,
+    IntegerLiteral, LetStatement, PrefixLiteral, ReturnStatement, Statement, StringLiteral,
 };
 
 use super::{
@@ -111,10 +111,14 @@ fn eval_expression(expr: &Expression, env: Env) -> Result<Object, Error> {
         Expression::IfExpression(ie) => eval_if_literal(ie, Rc::clone(&env))?,
         Expression::FunctionExpression(fe) => evaluate_function_literal(fe, Rc::clone(&env))?,
         Expression::CallExpression(ce) => evaluate_call_expression(ce, Rc::clone(&env))?,
-        _ => Object::Null,
+        Expression::StringExpression(se) => evaluate_string_expression(se, Rc::clone(&env))?,
     };
 
     Ok(object)
+}
+
+fn evaluate_string_expression(se: &StringLiteral, env: Env) -> Result<Object, Error> {
+    Ok(Object::String(se.value.clone()))
 }
 
 fn evaluate_function_literal(fe: &FunctionLiteral, env: Env) -> Result<Object, Error> {
@@ -250,7 +254,7 @@ fn evaluate_infix_literal(infix_literal: &InfixLiteral, env: Env) -> Result<Obje
         (Object::Integer(l), "!=", Object::Integer(r)) => Ok(Object::Boolean(l != r)),
         (Object::Boolean(l), "==", Object::Boolean(r)) => Ok(Object::Boolean(l == r)),
         (Object::Boolean(l), "!=", Object::Boolean(r)) => Ok(Object::Boolean(l != r)),
-
+        (Object::String(s), "+", Object::String(r)) => Ok(Object::String(format!("{}{}", s, r))),
         _ => Err(anyhow!("type mismatch in infix expression")),
     }
 }
@@ -304,6 +308,37 @@ mod tests {
             Object::Integer(value) => assert_eq!(*value, expected, "object has wrong value"),
             _ => panic!("object is not Integer. got={:?}", obj),
         }
+    }
+
+    #[test]
+    fn test_string_concatenation() -> Result<(), anyhow::Error> {
+        let input = "\"Hello\" + \" \" + \"World!\"";
+
+        let evaluated = test_eval(input)?;
+
+        match evaluated {
+            Object::String(s) => {
+                assert_eq!(s, "Hello World!")
+            }
+            _ => panic!("Not a string object type"),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_string_literal_object() -> Result<(), anyhow::Error> {
+        let input = "\"Hello World!\"";
+
+        let evaluated = test_eval(input)?;
+
+        match evaluated {
+            Object::String(s) => {
+                assert_eq!(s, "Hello World!")
+            }
+            _ => panic!("Not a string object type"),
+        }
+        Ok(())
     }
 
     #[test]

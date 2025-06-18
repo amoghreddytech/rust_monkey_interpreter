@@ -44,6 +44,8 @@ pub enum TokenType {
     RPAREN,
     LBRACE,
     RBRACE,
+    LBACKET,
+    RBRAKCET,
 
     // Keywords
     FUNCTION,
@@ -86,6 +88,8 @@ impl TokenType {
             TokenType::ELSE => "else".to_string(),
             TokenType::RETURN => "return".to_string(),
             TokenType::String(i) => i.to_owned(),
+            TokenType::LBACKET => "[".to_string(),
+            TokenType::RBRAKCET => "]".to_string(),
         }
     }
 
