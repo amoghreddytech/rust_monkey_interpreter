@@ -20,6 +20,7 @@ pub enum Object {
     Function(FuctionObject),
     String(String),
     Builtin(BuiltinFunction),
+    Array(Vec<Box<Object>>),
 }
 
 pub type BuiltinFunction = fn(Vec<Object>) -> Result<Object, Error>;
@@ -34,10 +35,11 @@ impl Object {
             Self::Function(_) => "Function",
             Self::String(_) => "String",
             Self::Builtin(_) => "Builtin",
+            Self::Array(_) => "Array",
         }
     }
 
-    pub fn inspect(self) -> String {
+    pub fn inspect(&self) -> String {
         return match self {
             Self::Integer(int_val) => int_val.to_string(),
             Self::Boolean(bool_val) => bool_val.to_string(),
@@ -53,8 +55,13 @@ impl Object {
 
                 format!("fn({}) {{\n{}\n}}", params, fo.body.string_representation())
             }
-            Self::String(s) => s,
+            Self::String(s) => s.to_string(),
             Self::Builtin(_) => "builtin function".to_string(),
+            Self::Array(a) => a
+                .iter()
+                .map(|ob| ob.inspect())
+                .collect::<Vec<String>>()
+                .join(" ,"),
         };
     }
 }

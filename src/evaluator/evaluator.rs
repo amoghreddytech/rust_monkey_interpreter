@@ -3,8 +3,8 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use anyhow::{Error, Result, anyhow};
 
 use crate::parser::{
-    AbstractSyntaxTree, BlockStatement, BooleanLiteral, CallLiteral, Expression,
-    ExpressionStatement, FunctionLiteral, IdentifierLiteral, IfLiteral, InfixLiteral,
+    AbstractSyntaxTree, ArrayLiteral, BlockStatement, BooleanLiteral, CallLiteral, Expression,
+    ExpressionStatement, FunctionLiteral, IdentifierLiteral, IfLiteral, IndexLiteral, InfixLiteral,
     IntegerLiteral, LetStatement, PrefixLiteral, ReturnStatement, Statement, StringLiteral,
 };
 
@@ -112,11 +112,49 @@ fn eval_expression(expr: &Expression, env: Env) -> Result<Object, Error> {
         Expression::FunctionExpression(fe) => evaluate_function_literal(fe, Rc::clone(&env))?,
         Expression::CallExpression(ce) => evaluate_call_expression(ce, Rc::clone(&env))?,
         Expression::StringExpression(se) => evaluate_string_expression(se, Rc::clone(&env))?,
-        Expression::ArrayExpression(ae) => todo!(),
-        Expression::IndexExpression(ie) => todo!(),
+        Expression::ArrayExpression(ae) => evalutate_array_expression(ae, Rc::clone(&env))?,
+        Expression::IndexExpression(ie) => evaluate_index_expression(ie, Rc::clone(&env))?,
     };
 
     Ok(object)
+}
+
+fn evaluate_index_expression(ie: &IndexLiteral, env: Env) -> Result<Object, Error> {
+    let array_object = eval(Node::ExpressionNode(&ie.left), Rc::clone(&env))?;
+
+    let index_object = eval(Node::ExpressionNode(&ie.index), Rc::clone(&env))?;
+
+    match (array_object, index_object) {
+        (Object::Array(arr), Object::Integer(index)) => {
+            let max_index: i64 = (arr.len() - 1) as i64;
+
+            if index < 0 || index > max_index {
+                return Ok(Object::Null);
+            }
+
+            return Ok(*arr[index as usize].clone());
+        }
+        (a, b) => {
+            return Err(anyhow!(
+                "Did not get an array and an integer in the index expression evaluation (Object my fiends) got {:?} {:?} ",
+                a.get_type(),
+                b.get_type()
+            ));
+        }
+    }
+    todo!()
+}
+
+fn evalutate_array_expression(ar: &ArrayLiteral, env: Env) -> Result<Object, Error> {
+    let mut objects: Vec<Box<Object>> = Vec::new();
+
+    for expression in &ar.elements {
+        let expression = *expression.clone();
+        let object = eval(Node::ExpressionNode(&expression), Rc::clone(&env))?;
+        objects.push(Box::new(object));
+    }
+
+    Ok(Object::Array(objects))
 }
 
 fn evaluate_string_expression(se: &StringLiteral, env: Env) -> Result<Object, Error> {
@@ -313,6 +351,95 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_array_index_expressions() -> Result<()> {
+        struct TestCase<'a> {
+            input: &'a str,
+            expected: Object, // None for nil/null, Some(val) for int
+        }
+
+        let tests = vec![
+            TestCase {
+                input: "[1, 2, 3][0]",
+                expected: Object::Integer(1),
+            },
+            TestCase {
+                input: "[1, 2, 3][1]",
+                expected: Object::Integer(2),
+            },
+            TestCase {
+                input: "[1, 2, 3][2]",
+                expected: Object::Integer(3),
+            },
+            TestCase {
+                input: "let i = 0; [1][i];",
+                expected: Object::Integer(1),
+            },
+            TestCase {
+                input: "[1, 2, 3][1 + 1];",
+                expected: Object::Integer(3),
+            },
+            TestCase {
+                input: "let myArray = [1, 2, 3]; myArray[2];",
+                expected: Object::Integer(3),
+            },
+            TestCase {
+                input: "let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];",
+                expected: Object::Integer(6),
+            },
+            TestCase {
+                input: "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i];",
+                expected: Object::Integer(2),
+            },
+            TestCase {
+                input: "[1, 2, 3][3]",
+                expected: Object::Null,
+            },
+            TestCase {
+                input: "[1, 2, 3][-1]",
+                expected: Object::Null,
+            },
+        ];
+
+        for tt in tests {
+            let result = test_eval(tt.input)?;
+
+            match (&result, &tt.expected) {
+                (Object::Integer(actual), Object::Integer(expected)) => {
+                    assert_eq!(actual, expected)
+                }
+                (Object::Null, Object::Null) => {}
+
+                _ => {
+                    println!(
+                        "array_object: {:?}, index_object: {:?}",
+                        result, tt.expected
+                    );
+                    panic!("test ans can't be anything but null or int at the moment")
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_array_literals() -> Result<(), Error> {
+        let input = "[1, 2 * 2, 3 + 3]";
+
+        let evaluated = test_eval(input)?;
+
+        match evaluated {
+            Object::Array(vec) => {
+                test_integer_object(&vec[0], 1);
+                test_integer_object(&vec[1], 4);
+                test_integer_object(&vec[2], 6);
+            }
+            _ => panic!(),
+        }
+
+        Ok(())
+    }
     #[test]
     fn test_builtin_functions() -> Result<(), Error> {
         struct TestCase {
