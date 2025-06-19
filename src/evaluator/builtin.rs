@@ -97,10 +97,11 @@ pub fn push(args: Vec<Object>) -> Result<Object, Error> {
 
     match &args[0] {
         Object::Array(arr) => {
-            let length = arr.len();
-            let mut array_arguments = arr.clone();
-            array_arguments.push(Box::new(args[1].clone()));
-            return Ok(Object::Array(array_arguments));
+            let mut new_arr: Vec<Box<Object>> = Vec::new();
+            arr.iter()
+                .for_each(|value| new_arr.push(Box::new(*value.clone())));
+            new_arr.push(Box::new(args[1].clone()));
+            return Ok(Object::Array(new_arr));
         }
         _ => Err(anyhow!("Not an array object can't call push")),
     }
