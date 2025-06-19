@@ -449,6 +449,7 @@ mod tests {
 
         enum ExpectedValue {
             Int(i64),
+            Arr(Vec<Object>),
             Str(&'static str), // For error messages
         }
 
@@ -462,8 +463,37 @@ mod tests {
                 expected: ExpectedValue::Int(4),
             },
             TestCase {
-                input: r#"len("hello world")"#,
+                input: r#",len("hello world")"#,
                 expected: ExpectedValue::Int(11),
+            },
+            TestCase {
+                input: "let a = [1,2,3,4];
+                first(a);",
+                expected: ExpectedValue::Int(1),
+            },
+            TestCase {
+                input: "let a = [1,2,3,4];
+                last(a);",
+                expected: ExpectedValue::Int(4),
+            },
+            TestCase {
+                input: "let a = [1,2,3,4];
+                rest(a)",
+                expected: ExpectedValue::Arr(vec![
+                    Object::Integer(2),
+                    Object::Integer(3),
+                    Object::Integer(4),
+                ]),
+            },
+            TestCase {
+                input: "let a = [2,3,4];
+                push(a, 3)",
+                expected: ExpectedValue::Arr(vec![
+                    Object::Integer(2),
+                    Object::Integer(3),
+                    Object::Integer(4),
+                    Object::Integer(3),
+                ]),
             },
         ];
 
@@ -475,10 +505,17 @@ mod tests {
                     ExpectedValue::Int(y) => assert_eq!(x, y),
                     _ => panic!(),
                 },
-                _ => panic!(),
+                Object::Array(arr) => match tt.expected {
+                    ExpectedValue::Arr(expected_arr) => {
+                        println!("{:?}, {:?}", arr, expected_arr);
+                    }
+                    _ => panic!(),
+                },
+                _ => {
+                    println!("{:?}", result);
+                    panic!()
+                }
             }
-
-            println!("{:?}", result);
         }
 
         Ok(())

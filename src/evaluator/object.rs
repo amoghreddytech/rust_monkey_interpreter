@@ -80,7 +80,10 @@ impl Environment {
         };
 
         env.set("len", Object::Builtin(builtin::len));
-
+        env.set("first", Object::Builtin(builtin::first));
+        env.set("last", Object::Builtin(builtin::last));
+        env.set("rest", Object::Builtin(builtin::rest));
+        env.set("push", Object::Builtin(builtin::push));
         env
     }
 
