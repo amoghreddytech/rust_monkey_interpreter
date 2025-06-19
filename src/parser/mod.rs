@@ -8,10 +8,13 @@ mod statement_structs;
 pub use ast::AbstractSyntaxTree;
 
 pub use expression::Expression;
+
 pub use expression_structs::array_literal::ArrayLiteral;
 pub use expression_structs::boolean_literal::BooleanLiteral;
 pub use expression_structs::call_literal::CallLiteral;
 pub use expression_structs::function_literal::FunctionLiteral;
+pub use expression_structs::hash_literal::HashLiteral;
+
 pub use expression_structs::identifier::IdentifierLiteral;
 pub use expression_structs::if_literal::IfLiteral;
 pub use expression_structs::index_expression::IndexLiteral;

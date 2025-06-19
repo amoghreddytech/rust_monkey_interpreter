@@ -1,6 +1,6 @@
 use super::{
-    ArrayLiteral, BooleanLiteral, CallLiteral, FunctionLiteral, IdentifierLiteral, IfLiteral,
-    IndexLiteral, InfixLiteral, IntegerLiteral, PrefixLiteral, StringLiteral,
+    ArrayLiteral, BooleanLiteral, CallLiteral, FunctionLiteral, HashLiteral, IdentifierLiteral,
+    IfLiteral, IndexLiteral, InfixLiteral, IntegerLiteral, PrefixLiteral, StringLiteral,
 };
 
 #[derive(Debug, Clone)]
@@ -16,6 +16,7 @@ pub enum Expression {
     StringExpression(StringLiteral),
     ArrayExpression(ArrayLiteral),
     IndexExpression(IndexLiteral),
+    HashExpression(HashLiteral),
 }
 
 impl Expression {
@@ -32,6 +33,7 @@ impl Expression {
             Self::StringExpression(string_literal) => string_literal.value.clone(),
             Self::ArrayExpression(array_literal) => array_literal.token.token_literal(),
             Self::IndexExpression(index_literal) => index_literal.token.token_literal(),
+            Self::HashExpression(hash_literal) => hash_literal.token.token_literal(),
         }
     }
 
@@ -113,6 +115,19 @@ impl Expression {
                 let left_string_literal = index_literal.left.string_literal();
                 let index_string_literal = index_literal.index.string_literal();
                 format!("({}[{}])", left_string_literal, index_string_literal)
+            }
+            Self::HashExpression(hash_literal) => {
+                let mut pairs: Vec<String> = Vec::new();
+                for (key, value) in &hash_literal.pairs {
+                    pairs.push(format!(
+                        "{}:{}",
+                        key.string_literal(),
+                        value.string_literal()
+                    ))
+                }
+                let result = format!("{{{}}}", pairs.join(", "));
+
+                result
             }
         }
     }
