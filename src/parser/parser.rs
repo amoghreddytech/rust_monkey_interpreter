@@ -148,7 +148,7 @@ impl Parser {
             TokenType::LPAREN => self.parse_grouped_expressions()?,
             TokenType::IF => self.parse_if_expression()?,
             TokenType::FUNCTION => self.parse_function_expression()?,
-            TokenType::LBACKET => self.parse_array_literal()?,
+            TokenType::LBRACKET => self.parse_array_literal()?,
 
             TokenType::String(_) => self.parse_string_expression()?,
 
@@ -164,7 +164,7 @@ impl Parser {
                 continue;
             }
 
-            if self.peek_token_is(TokenType::LBACKET) {
+            if self.peek_token_is(TokenType::LBRACKET) {
                 self.next_token();
                 left_exp = self.parse_index_expression(Box::new(left_exp))?;
                 continue;

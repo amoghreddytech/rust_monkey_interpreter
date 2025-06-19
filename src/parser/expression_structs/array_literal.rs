@@ -11,7 +11,7 @@ pub struct ArrayLiteral {
 impl ArrayLiteral {
     pub fn new(token: TokenType, elements: Vec<Box<Expression>>) -> Result<Self, Error> {
         match token {
-            TokenType::LBACKET => Ok(Self { token, elements }),
+            TokenType::LBRACKET => Ok(Self { token, elements }),
             _ => Err(anyhow!(
                 "Found wrong tokentype in arrayLiteral created got {:?}",
                 token

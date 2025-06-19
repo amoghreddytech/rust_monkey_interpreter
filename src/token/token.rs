@@ -45,8 +45,9 @@ pub enum TokenType {
     RPAREN,
     LBRACE,
     RBRACE,
-    LBACKET,
+    LBRACKET,
     RBRAKCET,
+    COLON,
 
     // Keywords
     FUNCTION,
@@ -89,8 +90,9 @@ impl TokenType {
             TokenType::ELSE => "else".to_string(),
             TokenType::RETURN => "return".to_string(),
             TokenType::String(i) => i.to_owned(),
-            TokenType::LBACKET => "[".to_string(),
+            TokenType::LBRACKET => "[".to_string(),
             TokenType::RBRAKCET => "]".to_string(),
+            TokenType::COLON => ":".to_string(),
         }
     }
 
@@ -115,7 +117,7 @@ impl TokenType {
             TokenType::PLUS | TokenType::MINUS => PRECEDENCE::SUM,
             TokenType::SLASH | TokenType::ASTERISK => PRECEDENCE::PRODUCT,
             TokenType::LPAREN => PRECEDENCE::CALL,
-            TokenType::LBACKET => PRECEDENCE::INDEX,
+            TokenType::LBRACKET => PRECEDENCE::INDEX,
             _ => PRECEDENCE::LOWEST,
         }
     }
