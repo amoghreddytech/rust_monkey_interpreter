@@ -5,11 +5,11 @@ use crate::{TokenType, parser::Expression};
 #[derive(Debug, Clone)]
 pub struct HashLiteral {
     pub token: TokenType,
-    pub pairs: HashMap<Expression, Expression>,
+    pub pairs: Vec<(Box<Expression>, Box<Expression>)>,
 }
 
 impl HashLiteral {
-    pub fn new(token: TokenType, pairs: HashMap<Expression, Expression>) -> Self {
+    pub fn new(token: TokenType, pairs: Vec<(Box<Expression>, Box<Expression>)>) -> Self {
         Self { token, pairs }
     }
 }

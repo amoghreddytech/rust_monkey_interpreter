@@ -1,7 +1,10 @@
+use std::collections::HashMap;
+
 use super::{
     AbstractSyntaxTree, ArrayLiteral, BlockStatement, BooleanLiteral, CallLiteral, Expression,
-    ExpressionStatement, FunctionLiteral, IdentifierLiteral, IfLiteral, IndexLiteral, InfixLiteral,
-    IntegerLiteral, LetStatement, PrefixLiteral, ReturnStatement, Statement, StringLiteral,
+    ExpressionStatement, FunctionLiteral, HashLiteral, IdentifierLiteral, IfLiteral, IndexLiteral,
+    InfixLiteral, IntegerLiteral, LetStatement, PrefixLiteral, ReturnStatement, Statement,
+    StringLiteral,
 };
 use crate::{Lexer, PRECEDENCE, TokenType};
 use anyhow::{Error, Result, anyhow};
@@ -149,8 +152,8 @@ impl Parser {
             TokenType::IF => self.parse_if_expression()?,
             TokenType::FUNCTION => self.parse_function_expression()?,
             TokenType::LBRACKET => self.parse_array_literal()?,
-
             TokenType::String(_) => self.parse_string_expression()?,
+            TokenType::LBRACE => self.parse_hash_expression()?,
 
             _ => return Err(anyhow!("no prefix parse function for {:?}", self.cur_token)),
         };
@@ -179,6 +182,43 @@ impl Parser {
         }
 
         Ok(left_exp)
+    }
+
+    fn parse_hash_expression(&mut self) -> Result<Expression, Error> {
+        let token = self.cur_token.clone();
+
+        let mut jesus: Vec<(Box<Expression>, Box<Expression>)> = vec![];
+
+        // // check for empty hash first : {}
+
+        if self.peek_token_is(TokenType::RBRACE) {
+            self.next_token();
+            return Ok(Expression::HashExpression(HashLiteral::new(token, jesus)));
+        }
+
+        while !self.peek_token_is(TokenType::RBRACE) {
+            self.next_token();
+
+            let key = self.parse_expression(PRECEDENCE::LOWEST)?;
+            self.is_peek_and_move(TokenType::COLON)?;
+            self.next_token();
+            let value = self.parse_expression(PRECEDENCE::LOWEST)?;
+
+            jesus.push((Box::new(key), Box::new(value)));
+
+            if self.peek_token_is(TokenType::RBRACE) {
+                self.next_token();
+                break;
+            }
+            self.next_token();
+
+            if self.peek_token_is(TokenType::COMMA) {
+                self.next_token();
+            }
+        }
+
+        let hash_literal = HashLiteral::new(token, jesus);
+        Ok(Expression::HashExpression(hash_literal))
     }
 
     fn parse_index_expression(&mut self, left: Box<Expression>) -> Result<Expression, Error> {
@@ -420,6 +460,225 @@ mod tests {
         Lexer,
         parser::{Expression, Statement},
     };
+
+    fn verify_pair(
+        pair: &(Box<Expression>, Box<Expression>),
+        expected_key: &str,
+        expected_value: i64,
+    ) {
+        // Verify key is a string literal with expected value
+        match &*pair.0 {
+            Expression::StringExpression(str_lit) => assert_eq!(
+                str_lit.value, expected_key,
+                "Expected key '{}', got '{}'",
+                expected_key, str_lit.value
+            ),
+            _ => panic!("Key is not a string literal: {:?}", pair.0),
+        }
+
+        // Verify value is an integer with expected value
+        match &*pair.1 {
+            Expression::IntegerExpression(int) => assert_eq!(
+                int.value, expected_value,
+                "Expected value {}, got {}",
+                expected_value, int.value
+            ),
+            _ => panic!("Value is not an integer: {:?}", pair.1),
+        }
+    }
+
+    #[test]
+    fn test_parsing_hash_literals_with_expressions() {
+        let input = r#"{"one": 0 + 1, "two": 10 - 8, "three": 15 / 5}"#;
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().expect("Failed to parse Program");
+
+        // Verify no parsing errors
+        assert!(
+            parser.errors.is_empty(),
+            "Parser had errors: {:?}",
+            parser.errors
+        );
+
+        // Verify we have exactly one statement
+        assert_eq!(program.statements.len(), 1, "Expected 1 statement");
+
+        // Extract the expression statement
+        let stmt = match &program.statements[0] {
+            Statement::ExpressionStatement(s) => s,
+            _ => panic!(
+                "Expected ExpressionStatement, got {:?}",
+                program.statements[0]
+            ),
+        };
+
+        // Verify it's a hash expression
+        let hash_expr = match &*stmt.expression {
+            Expression::HashExpression(h) => h,
+            _ => panic!("Expected HashExpression, got {:?}", stmt.expression),
+        };
+
+        // Verify we have exactly 3 key-value pairs
+        assert_eq!(
+            hash_expr.pairs.len(),
+            3,
+            "Expected 3 pairs, got {}",
+            hash_expr.pairs.len()
+        );
+
+        // Define test cases for each expected key-value pair
+        let test_cases = vec![
+            ("one", 0, "+", 1),
+            ("two", 10, "-", 8),
+            ("three", 15, "/", 5),
+        ];
+
+        // Verify each pair
+        for (expected_key, left_val, op, right_val) in test_cases {
+            // Find the pair with matching key
+            let pair = hash_expr
+                .pairs
+                .iter()
+                .find(|(k, _)| {
+                    if let Expression::StringExpression(s) = &**k {
+                        s.value == expected_key
+                    } else {
+                        false
+                    }
+                })
+                .unwrap_or_else(|| panic!("Key '{}' not found in hash", expected_key));
+
+            // Verify the value is an infix expression with expected components
+            match &*pair.1 {
+                Expression::InfixExpression(infix) => {
+                    // Verify left operand
+                    match &*infix.left {
+                        Expression::IntegerExpression(i) => assert_eq!(
+                            i.value, left_val,
+                            "Expected left operand {} for key '{}', got {}",
+                            left_val, expected_key, i.value
+                        ),
+                        _ => panic!("Left operand for key '{}' is not an integer", expected_key),
+                    }
+
+                    // Verify operator
+                    assert_eq!(
+                        infix.operator, op,
+                        "Expected operator '{}' for key '{}', got '{}'",
+                        op, expected_key, infix.operator
+                    );
+
+                    // Verify right operand
+                    match &*infix.right {
+                        Expression::IntegerExpression(i) => assert_eq!(
+                            i.value, right_val,
+                            "Expected right operand {} for key '{}', got {}",
+                            right_val, expected_key, i.value
+                        ),
+                        _ => panic!("Right operand for key '{}' is not an integer", expected_key),
+                    }
+                }
+                _ => panic!(
+                    "Value for key '{}' is not an infix expression",
+                    expected_key
+                ),
+            }
+        }
+    }
+    #[test]
+    fn test_parsing_hash_literals_string_keys() {
+        let input = r#"{"one": 1, "two": 2, "three": 3}"#;
+
+        // let input = r#"{}"#;
+
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().expect("Failed to parse Prograrm");
+        check_parse_errors(&parser);
+
+        // Verify no parsing errors
+        assert!(
+            parser.errors.is_empty(),
+            "Parser had errors: {:?}",
+            parser.errors
+        );
+
+        // Verify we have exactly one statement
+        assert_eq!(program.statements.len(), 1, "Expected 1 statement");
+
+        // Extract the expression statement
+        let stmt = match &program.statements[0] {
+            Statement::ExpressionStatement(s) => s,
+            _ => panic!(
+                "Expected ExpressionStatement, got {:?}",
+                program.statements[0]
+            ),
+        };
+
+        // Verify it's a hash expression
+        let hash_expr = match &*stmt.expression {
+            Expression::HashExpression(h) => h,
+            _ => panic!("Expected HashExpression, got {:?}", stmt.expression),
+        };
+
+        // Verify we have exactly 3 key-value pairs
+        assert_eq!(
+            hash_expr.pairs.len(),
+            3,
+            "Expected 3 pairs, got {}",
+            hash_expr.pairs.len()
+        );
+
+        verify_pair(&hash_expr.pairs[0], "one", 1);
+        verify_pair(&hash_expr.pairs[1], "two", 2);
+        verify_pair(&hash_expr.pairs[2], "three", 3);
+    }
+
+    #[test]
+    fn test_parsing_hash_literals_empty() {
+        let input = r#"{}"#;
+
+        // let input = r#"{}"#;
+
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program().expect("Failed to parse Prograrm");
+        check_parse_errors(&parser);
+
+        // Verify no parsing errors
+        assert!(
+            parser.errors.is_empty(),
+            "Parser had errors: {:?}",
+            parser.errors
+        );
+
+        // Verify we have exactly one statement
+        assert_eq!(program.statements.len(), 1, "Expected 1 statement");
+
+        // Extract the expression statement
+        let stmt = match &program.statements[0] {
+            Statement::ExpressionStatement(s) => s,
+            _ => panic!(
+                "Expected ExpressionStatement, got {:?}",
+                program.statements[0]
+            ),
+        };
+
+        // Verify it's a hash expression
+        let hash_expr = match &*stmt.expression {
+            Expression::HashExpression(h) => h,
+            _ => panic!("Expected HashExpression, got {:?}", stmt.expression),
+        };
+
+        // Verify we have exactly 3 key-value pairs
+        assert_eq!(
+            hash_expr.pairs.len(),
+            0,
+            "Expected 0 pairs, got {}",
+            hash_expr.pairs.len()
+        );
+    }
 
     #[test]
     fn test_parsing_index_expression() {

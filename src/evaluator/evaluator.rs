@@ -114,6 +114,7 @@ fn eval_expression(expr: &Expression, env: Env) -> Result<Object, Error> {
         Expression::StringExpression(se) => evaluate_string_expression(se, Rc::clone(&env))?,
         Expression::ArrayExpression(ae) => evalutate_array_expression(ae, Rc::clone(&env))?,
         Expression::IndexExpression(ie) => evaluate_index_expression(ie, Rc::clone(&env))?,
+        Expression::HashExpression(he) => todo!(),
     };
 
     Ok(object)

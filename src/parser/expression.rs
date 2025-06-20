@@ -118,13 +118,7 @@ impl Expression {
             }
             Self::HashExpression(hash_literal) => {
                 let mut pairs: Vec<String> = Vec::new();
-                for (key, value) in &hash_literal.pairs {
-                    pairs.push(format!(
-                        "{}:{}",
-                        key.string_literal(),
-                        value.string_literal()
-                    ))
-                }
+                for (key, value) in &hash_literal.pairs {}
                 let result = format!("{{{}}}", pairs.join(", "));
 
                 result
