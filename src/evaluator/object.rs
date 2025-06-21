@@ -118,6 +118,7 @@ impl Environment {
         env.set("last", Object::Builtin(builtin::last));
         env.set("rest", Object::Builtin(builtin::rest));
         env.set("push", Object::Builtin(builtin::push));
+        env.set("puts", Object::Builtin(builtin::puts));
         env
     }
 

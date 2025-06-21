@@ -106,3 +106,10 @@ pub fn push(args: Vec<Object>) -> Result<Object, Error> {
         _ => Err(anyhow!("Not an array object can't call push")),
     }
 }
+
+pub fn puts(args: Vec<Object>) -> Result<Object, Error> {
+    for object in args {
+        println!("{}", object.inspect());
+    }
+    Ok(Object::Null)
+}

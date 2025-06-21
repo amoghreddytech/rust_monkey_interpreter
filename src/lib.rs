@@ -4,7 +4,7 @@ mod evaluator;
 mod lexer;
 // mod object;
 mod parser;
-// pub mod repl;
+pub mod repl;
 mod token;
 
 pub use lexer::lexer::Lexer;
