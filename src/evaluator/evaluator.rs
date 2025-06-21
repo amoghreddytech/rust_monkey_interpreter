@@ -4,8 +4,9 @@ use anyhow::{Error, Result, anyhow};
 
 use crate::parser::{
     AbstractSyntaxTree, ArrayLiteral, BlockStatement, BooleanLiteral, CallLiteral, Expression,
-    ExpressionStatement, FunctionLiteral, IdentifierLiteral, IfLiteral, IndexLiteral, InfixLiteral,
-    IntegerLiteral, LetStatement, PrefixLiteral, ReturnStatement, Statement, StringLiteral,
+    ExpressionStatement, FunctionLiteral, HashLiteral, IdentifierLiteral, IfLiteral, IndexLiteral,
+    InfixLiteral, IntegerLiteral, LetStatement, PrefixLiteral, ReturnStatement, Statement,
+    StringLiteral,
 };
 
 use super::{
@@ -114,16 +115,31 @@ fn eval_expression(expr: &Expression, env: Env) -> Result<Object, Error> {
         Expression::StringExpression(se) => evaluate_string_expression(se, Rc::clone(&env))?,
         Expression::ArrayExpression(ae) => evalutate_array_expression(ae, Rc::clone(&env))?,
         Expression::IndexExpression(ie) => evaluate_index_expression(ie, Rc::clone(&env))?,
-        Expression::HashExpression(he) => todo!(),
+        Expression::HashExpression(he) => evaluate_hash_expression(he, Rc::clone(&env))?,
     };
 
     Ok(object)
 }
 
-fn evaluate_index_expression(ie: &IndexLiteral, env: Env) -> Result<Object, Error> {
-    let array_object = eval(Node::ExpressionNode(&ie.left), Rc::clone(&env))?;
+fn evaluate_hash_expression(hi: &HashLiteral, env: Env) -> Result<Object, Error> {
+    // my parirs are a vec<Box<Expresion>, Box<Expression>>
 
-    let index_object = eval(Node::ExpressionNode(&ie.index), Rc::clone(&env))?;
+    let mut map: HashMap<Object, Object> = HashMap::new();
+
+    for (key, value) in &hi.pairs {
+        let key: Object = eval_expression(&*key, Rc::clone(&env))?;
+        let value: Object = eval_expression(&*value, Rc::clone(&env))?;
+
+        map.insert(key, value);
+    }
+
+    Ok(Object::HashMap(map))
+}
+
+fn evaluate_index_expression(ie: &IndexLiteral, env: Env) -> Result<Object, Error> {
+    // let array_object = eval(Node::ExpressionNode(&ie.left), Rc::clone(&env))?;
+    let array_object = eval_expression(&ie.left, Rc::clone(&env))?;
+    let index_object = eval_expression(&ie.index, Rc::clone(&env))?;
 
     match (array_object, index_object) {
         (Object::Array(arr), Object::Integer(index)) => {
@@ -135,6 +151,10 @@ fn evaluate_index_expression(ie: &IndexLiteral, env: Env) -> Result<Object, Erro
 
             return Ok(*arr[index as usize].clone());
         }
+        (Object::HashMap(hash), key) => match hash.get(&key) {
+            Some(value) => Ok(value.clone()),
+            None => Ok(Object::Null),
+        },
         (a, b) => {
             return Err(anyhow!(
                 "Did not get an array and an integer in the index expression evaluation (Object my fiends) got {:?} {:?} ",
@@ -143,7 +163,6 @@ fn evaluate_index_expression(ie: &IndexLiteral, env: Env) -> Result<Object, Erro
             ));
         }
     }
-    todo!()
 }
 
 fn evalutate_array_expression(ar: &ArrayLiteral, env: Env) -> Result<Object, Error> {
@@ -352,6 +371,121 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_hash_index_expressions() -> Result<(), Error> {
+        struct TestCase<'a> {
+            input: &'a str,
+            expected: ExpectedValue,
+        }
+
+        enum ExpectedValue {
+            Int(i64),
+            Null,
+        }
+
+        let tests = vec![
+            TestCase {
+                input: r#"{"foo": 5}["foo"]"#,
+                expected: ExpectedValue::Int(5),
+            },
+            TestCase {
+                input: r#"{"foo": 5}["bar"]"#,
+                expected: ExpectedValue::Null,
+            },
+            TestCase {
+                input: r#"let key = "foo"; {"foo": 5}[key]"#,
+                expected: ExpectedValue::Int(5),
+            },
+            TestCase {
+                input: r#"{}["foo"]"#,
+                expected: ExpectedValue::Null,
+            },
+            TestCase {
+                input: r#"{5: 5}[5]"#,
+                expected: ExpectedValue::Int(5),
+            },
+            TestCase {
+                input: r#"{true: 5}[true]"#,
+                expected: ExpectedValue::Int(5),
+            },
+            TestCase {
+                input: r#"{false: 5}[false]"#,
+                expected: ExpectedValue::Int(5),
+            },
+        ];
+
+        for tt in tests {
+            let result = test_eval(tt.input)?;
+
+            match tt.expected {
+                ExpectedValue::Int(expected) => {
+                    if let Object::Integer(actual) = result {
+                        assert_eq!(actual, expected, "Expected {}, got {}", expected, actual);
+                    } else {
+                        panic!("Expected integer {}, got {:?}", expected, result);
+                    }
+                }
+                ExpectedValue::Null => {
+                    assert!(
+                        matches!(result, Object::Null),
+                        "Expected null, got {:?}",
+                        result
+                    );
+                }
+            }
+        }
+
+        Ok(())
+    }
+    #[test]
+    fn test_hash_literals() -> Result<(), Error> {
+        let input = r#"
+        let two = "two";
+        {
+            "one": 10 - 9,
+            two: 1 + 1,
+            "thr" + "ee": 6 / 2,
+            4: 4,
+            true: 5,
+            false: 6
+        }
+    "#;
+
+        let evaluated = test_eval(input)?;
+
+        match evaluated {
+            Object::HashMap(pairs) => {
+                // Create expected keys and values
+                let expected = vec![
+                    (Object::String("one".to_string()), Object::Integer(1)),
+                    (Object::String("two".to_string()), Object::Integer(2)),
+                    (Object::String("three".to_string()), Object::Integer(3)),
+                    (Object::Integer(4), Object::Integer(4)),
+                    (Object::Boolean(true), Object::Integer(5)),
+                    (Object::Boolean(false), Object::Integer(6)),
+                ];
+
+                // Check length matches
+                assert_eq!(
+                    pairs.len(),
+                    expected.len(),
+                    "Hash has wrong number of pairs"
+                );
+
+                // Check each expected pair
+                for (key, expected_value) in expected {
+                    match pairs.get(&key) {
+                        Some(value) => assert_eq!(*value, expected_value),
+                        None => panic!("No pair found for key: {:?}", key),
+                    }
+                    //
+                }
+            }
+            _ => panic!("Eval didn't return Hash. got={:?}", evaluated),
+        }
+
+        Ok(())
+    }
     #[test]
     fn test_array_index_expressions() -> Result<()> {
         struct TestCase<'a> {

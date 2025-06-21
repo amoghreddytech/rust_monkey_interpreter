@@ -2,6 +2,7 @@ use std::{
     borrow::{Borrow, BorrowMut},
     cell::RefCell,
     collections::HashMap,
+    hash::{Hash, Hasher},
     rc::Rc,
 };
 
@@ -21,6 +22,33 @@ pub enum Object {
     String(String),
     Builtin(BuiltinFunction),
     Array(Vec<Box<Object>>),
+    HashMap(HashMap<Object, Object>),
+}
+
+impl PartialEq for Object {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Object::Integer(i), Object::Integer(j)) => i == j,
+            (Object::Boolean(i), Object::Boolean(j)) => i == j,
+            (Object::String(i), Object::String(j)) => i == j,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Object {}
+
+impl Hash for Object {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+
+        match self {
+            Object::Integer(i) => i.hash(state),
+            Object::Boolean(b) => b.hash(state),
+            Object::String(s) => s.hash(state),
+            _ => (),
+        }
+    }
 }
 
 pub type BuiltinFunction = fn(Vec<Object>) -> Result<Object, Error>;
@@ -36,6 +64,7 @@ impl Object {
             Self::String(_) => "String",
             Self::Builtin(_) => "Builtin",
             Self::Array(_) => "Array",
+            Self::HashMap(_) => "Hash",
         }
     }
 
@@ -60,6 +89,11 @@ impl Object {
             Self::Array(a) => a
                 .iter()
                 .map(|ob| ob.inspect())
+                .collect::<Vec<String>>()
+                .join(" ,"),
+            Self::HashMap(map) => map
+                .iter()
+                .map(|(key, value)| format!("{}:{}", key.inspect(), value.inspect()))
                 .collect::<Vec<String>>()
                 .join(" ,"),
         };
